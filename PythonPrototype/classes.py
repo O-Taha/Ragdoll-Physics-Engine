@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable
 import pygame
 from pygame.math import Vector2, Vector3
 
@@ -6,10 +6,10 @@ running: bool = False
 
 class Point:
 	def __init__(self, pos: Vector3, vel: Vector3, w: float = 1.0):
-		self._pos:			Vector3	= pos			# DO NOT REMOVE '_' OR ELSE : RecursionError: maximum recursion depth exceeded
+		self._pos:			Vector3	= pos		# DO NOT REMOVE '_' OR ELSE : RecursionError: maximum recursion depth exceeded
 		self.vel:			Vector3	= vel
 		self.acc:			Vector3	= 0
-		self.w:				float	= w
+		self.w:				float	= w			# inverse of weight
 		self.recordPos:		Array[Vector3]	= [pos]
 	
 	@property
@@ -27,15 +27,74 @@ class Edge:
 		self.s: float = s
 
 class Body:
-	def __init__(self, pSet: List[Point], eSet: List[Edge], wireframe: bool, freeze: bool):
+	def __init__(self, pSet: List[Point], eSet: List[Edge], wireframe: bool, freeze: bool, forces: List[Callable]):
+		self.forces: List[Callable]
 		self.points: List[Point] = pSet
 		self.edges: List[Edge] = eSet
 		self.wireframe: bool = wireframe
 		self.freeze: bool = freeze
 
+
+def gravity(world, body, point):
+    """
+    world.g : Vector3
+    point.w : masse
+    """
+    return point.w * world.g
+
+def wind(world, body, point):
+    """
+    Force quadratique opposée à la vitesse relative à l'air
+	Hypothèses :
+		world.air_density
+		world.wind_velocity
+		body.area
+		body.drag_coeff
+    """
+    v_rel = point.vel - world.wind_velocity
+
+    speed = v_rel.length()
+    if speed == 0:
+        return Vector3(0,0,0)
+
+    direction = -v_rel.normalize()
+
+    return 0.5 * world.air_density * body.drag_coeff * body.area * speed**2 * direction
+
+def solid_friction(world, body, point):
+    """
+    Frottement cinétique simple
+	On suppose :
+		body.mu_s
+		body.mu_k
+		body.normal (Vector3)
+		collision déjà détectée
+    """
+    if not hasattr(body, "normal"):
+        return Vector3(0,0,0)
+
+    N = body.normal
+    normal_force = N * point.w * abs(world.g.dot(N))
+
+    v_tangent = point.vel - point.vel.dot(N) * N
+    speed = v_tangent.length()
+
+    if speed == 0:
+        return Vector3(0,0,0)
+
+    direction = -v_tangent.normalize()
+
+    return body.mu_k * normal_force.length() * direction
+
+def viscous_drag(world, body, point):
+    """
+    body.viscous_coeff = alpha
+    """
+    return -body.viscous_coeff * point.vel
+
 class World:
-	def __init__(self, forces: List[Vector3], bodies: List[Body], T: float = 0, h: float = 1.0):
-		self.forces: List[Vector3] = forces
+	def __init__(self, forces: List[Callable], bodies: List[Body], T: float = 0, h: float = 1.0):
+		self.global_forces: List[Callable] = forces
 		self.bodies: List[Body] = bodies
 		self.t: float = 0
 		self.T: float = T
@@ -68,7 +127,14 @@ class World:
 		pass
 
 	def computeAccel(self, p: Point) -> Vector3:
-		return sum(self.forces, Vector3(0, 0, 0)) * p.w
+		total_force = Vector3(0,0,0)
+
+		for f in self.global_forces:
+			total_force += f(self, body, point)
+		for f in body.forces:
+			total_force += f(self, body, point)
+
+		return total_force * point.w
 
 if __name__ == "__main__":
 	pygame.init()
@@ -118,5 +184,8 @@ if __name__ == "__main__":
 	pygame.quit()
 	print(p.recordPos)
 	# ajouter requirements.txt
-	# corriger les forces (pour chaque point)
+	# créer un setter/getter pour point.w et corriger les fonctions de forces en adéquation
+	# stocker temporairement en dur les coeff des forces
+	# tester les forces en callables
+	# transformer les forces en classes avec des sous-classes singleton qui ont chacun leurs paramètres spécifiques
 	# corriger t et T (T = 10 correspond a 3 sec...)
