@@ -30,16 +30,27 @@ class World:
 
 	def run(self, T: float = 0):
 		t: float = 0
+		times = []
+		positions_y = []
 		while((t < T) if T else 1):
 			for body in self.bodies:
 				for p in body.points:
 					self.verlet(p)
 					print(f"t={t:.2f} pos={p.pos} vel={p.vel}")
+					times.append(t)
+					positions_y.append(p.pos.y)
 				for p in body.points:
 					self.collision(p)
 				for e in body.edges:
 					self.constraint(e)
 			t += self.h
+		plt.figure()
+		plt.plot(times, positions_y)
+		plt.xlabel("Time (s)")
+		plt.ylabel("Height (y)")
+		plt.title("Point falling under gravity")
+		plt.grid(True)
+		plt.show()
 
 	def verlet(self, p:Point):
 		acc_n = self.computeAccel(p)
@@ -64,7 +75,7 @@ if __name__ == "__main__":
 	# Point initial à hauteur 10
 	p = Point(
 		pos=Vector3(0, 10, 0),
-		vel=Vector3(0, 0, 0),
+		vel=Vector3(0, 5, 0),
 		acc=Vector3(0, 0, 0),
 		w=1.0
 	)
@@ -78,7 +89,6 @@ if __name__ == "__main__":
 	)
 
 	world.run(T=2.0)
-
-	# git
+	
 	# affichage pygame
 	# corriger les forces (pour chaque point)
