@@ -27,22 +27,22 @@ class Edge:
 		self.s: float = s
 
 class Body:
-	def __init__(self, pSet: List[Point], eSet: List[Edge], wireframe: bool, freeze: bool, forces: List[Callable]):
-		self.forces: List[Callable]
-		self.points: List[Point] = pSet
-		self.edges: List[Edge] = eSet
+	def __init__(self, points: List[Point], edges: List[Edge], forces: List[Callable], wireframe: bool, freeze: bool,):
+		self.points: List[Point] = points
+		self.edges: List[Edge] = edges
+		self.forces: List[Callable] = forces
 		self.wireframe: bool = wireframe
 		self.freeze: bool = freeze
 
 
-def gravity(world, body, point):
+def gravity(world, body, point) -> Vector3:
     """
     world.g : Vector3
     point.w : masse
     """
-    return point.w * world.g
+    return Vector3(0, -9.81 / point.w, 0)
 
-def wind(world, body, point):
+def wind(world, body, point) -> Vector3:
     """
     Force quadratique opposée à la vitesse relative à l'air
 	Hypothèses :
@@ -61,7 +61,7 @@ def wind(world, body, point):
 
     return 0.5 * world.air_density * body.drag_coeff * body.area * speed**2 * direction
 
-def solid_friction(world, body, point):
+def solid_friction(world, body, point) -> Vector3:
     """
     Frottement cinétique simple
 	On suppose :
@@ -86,7 +86,7 @@ def solid_friction(world, body, point):
 
     return body.mu_k * normal_force.length() * direction
 
-def viscous_drag(world, body, point):
+def viscous_drag(world, body, point) -> Vector3:
     """
     body.viscous_coeff = alpha
     """
@@ -105,7 +105,7 @@ class World:
 		h = h or self.h
 		for body in self.bodies:
 			for p in body.points:
-				self.verlet(p)
+				self.verlet(body, p)
 			for p in body.points:
 				self.collision(p)
 			for e in body.edges:
@@ -113,11 +113,11 @@ class World:
 		self.t += h
 		self.recordTime.append(self.t)
 			
-	def verlet(self, p:Point):
-		acc_n = self.computeAccel(p)
+	def verlet(self, body,  p:Point):
+		acc_n = self.computeAccel(body, p)
 		p.acc = acc_n
 		p.pos = p.pos + self.h*p.vel + ((self.h**2)/2)*p.acc
-		p.acc = self.computeAccel(p)
+		p.acc = self.computeAccel(body, p)
 		p.vel = p.vel + (self.h/2)*(acc_n + p.acc)
 
 	def collision(self, p:Point):
@@ -126,7 +126,7 @@ class World:
 	def constraint(self, edge: Edge):
 		pass
 
-	def computeAccel(self, p: Point) -> Vector3:
+	def computeAccel(self, body: Body, point: Point) -> Vector3:
 		total_force = Vector3(0,0,0)
 
 		for f in self.global_forces:
@@ -151,8 +151,8 @@ if __name__ == "__main__":
 		vel=Vector3(10, 50, 0),
 		w=1.0
 	)
-	body = Body([p], [], wireframe=False, freeze=False)
-	world = World(forces=[g], bodies=[body], T = 0.0, h=0.1)
+	body = Body([p], [], [], wireframe=False, freeze=False)
+	world = World(forces=[gravity], bodies=[body], T = 0.0, h=0.1)
 
 	running = True
 	last_time = pygame.time.get_ticks() / 1000 # in seconds
@@ -165,7 +165,7 @@ if __name__ == "__main__":
 			if event.type == pygame.QUIT:
 				running = False
 
-		world.run_step()
+		world.run_step(pygame.time.Clock.get_time(clock))
 
 		screen.fill((0,0,0))
 		for body in world.bodies:
