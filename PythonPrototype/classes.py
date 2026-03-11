@@ -151,6 +151,11 @@ if __name__ == "__main__":
 		vel=Vector3(10, 50, 0),
 		w=1.0
 	)
+	p = Point(
+		pos=Vector3(screen_width/2, screen_height/2, 0),
+		vel=Vector3(10, 10, 0),
+		w=1.0
+	)
 	body = Body([p], [], [], wireframe=False, freeze=False)
 	world = World(forces=[gravity], bodies=[body], T = 0.0, h=0.1)
 
