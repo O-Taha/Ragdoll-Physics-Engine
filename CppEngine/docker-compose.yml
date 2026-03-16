@@ -1,0 +1,11 @@
+services:
+  dev:
+    build: .
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    environment:
+      - DISPLAY=${DISPLAY}
+    network_mode: host
+    stdin_open: true
+    tty: true

@@ -1,0 +1,10 @@
+git clone <repo>
+cd RagdollEngine
+
+docker compose build
+xhost +local:docker
+docker compose run --rm dev
+
+premake5 gmake2
+make
+./bin/Debug/RagdollEngine
