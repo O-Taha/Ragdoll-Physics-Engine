@@ -1,13 +1,14 @@
 from typing import List, Tuple, Callable
 import pygame
 from pygame.math import Vector2, Vector3
+import math
 
 running: bool = False
 
 class Point:
 	def __init__(self, pos: Vector3, vel: Vector3, w: float = 1.0):
 		self._pos:			Vector3	= pos		# DO NOT REMOVE '_' OR ELSE : RecursionError: maximum recursion depth exceeded
-		self._old_pos:		Vector3 = pos
+		self._old_pos:		Vector3 = Vector3(pos)
 		self.vel:			Vector3	= vel
 		self.acc:			Vector3	= 0
 		self.w:				float	= w			# inverse of weight
@@ -33,7 +34,7 @@ class Body:
 	def __init__(self, points: List[Point], edges: List[Edge], forces: List[Callable], wireframe: bool, freeze: bool,):
 		self.points: List[Point] = points
 		self.edges: List[Edge] = edges
-		self.forces: List[Callable] = forces
+		self.forces: List[Callable] = forces	
 		self.wireframe: bool = wireframe
 		self.freeze: bool = freeze
 
@@ -202,7 +203,40 @@ class World:
 		err = (d.length() - edge.l)/d.length()
 		edge.points[0].pos = edge.points[0].pos + edge.s * (edge.points[0].w / (edge.points[0].w + edge.points[1].w)) * err * d
 		edge.points[1].pos = edge.points[1].pos - edge.s * (edge.points[1].w / (edge.points[0].w + edge.points[1].w)) * err * d
-		
+
+	def Move(self, point: Point, newPos: Vector3):
+		pass
+
+	# rotate the body of an angle = (alpha, beta, theta) °, aplha is between xy, beta yz, theta zx
+	def Rotate(self, body: Body, angle: Vector3):
+		center = Vector3(0, 0, 0)
+		total_mass = 0
+		for p in body.points:
+			if p.w == 0: continue # On ignore les points infinis ou on leur donne un poids arbitraire
+			m = 1.0 / p.w
+			center += p.pos * m
+			total_mass += m
+
+		if total_mass == 0: return # Sécurité
+		center /= total_mass
+
+		cos_a = math.cos(angle.z)
+		sin_a = math.sin(angle.z)
+
+		for p in body.points:
+			rel_x = p.pos.x - center.x
+			rel_y = p.pos.y - center.y
+			#rel_z = p.pos.z - center.z
+
+			# rotation
+			new_x = rel_x * cos_a - rel_y * sin_a
+			new_y = rel_x * sin_a + rel_y * cos_a
+
+			# pour du statique, c'est pour ca qu'on met a la fois pour l'ancienne position (vitesse nulle)
+			p.pos.x = new_x + center.x
+			p.pos.y = new_y + center.y
+			p._old_pos.x = new_x + center.x
+			p._old_pos.y = new_y + center.y
 
 	def computeAccel(self, body: Body, point: Point) -> Vector3:
 		total_force = Vector3(0,0,0)
@@ -465,6 +499,14 @@ if __name__ == "__main__":
 				if event.key == pygame.K_SPACE:
 					for body in world.bodies:
 						body.freeze = not(body.freeze)
+
+				if event.key == pygame.K_LEFT:
+					# Rotation vers la gauche (sens anti-horaire)
+					world.Rotate(world.bodies[1], Vector3(0, 0, math.radians(10)))
+
+				if event.key == pygame.K_RIGHT:
+					# Rotation vers la droite (sens horaire)
+					world.Rotate(world.bodies[1], Vector3(0, 0, -math.radians(10)))
 				
 		if is_dragging and selected_point:
 			mx, my = pygame.mouse.get_pos()
