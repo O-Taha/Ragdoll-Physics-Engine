@@ -237,6 +237,11 @@ class World:
 			p.pos.y = new_y + center.y
 			p._old_pos.x = new_x + center.x
 			p._old_pos.y = new_y + center.y
+		
+	def impulse(self, p: Point, impulseForce: Vector3):
+		if p.w == 0: return
+
+		p.vel += impulseForce
 
 	def computeAccel(self, body: Body, point: Point) -> Vector3:
 		total_force = Vector3(0,0,0)
@@ -257,6 +262,9 @@ if __name__ == "__main__":
 
 	# Gravité vers le bas (axe Y négatif)
 	g = Vector3(0, -9.81, 0)
+
+	# impulsion pour tester
+	impulse = Vector3(0, 500, 0)
 
 	"""
 	#pendule
@@ -360,6 +368,7 @@ if __name__ == "__main__":
 
 	e1 = Edge(p1, p2, l=100.0, s=0.1)"""
 
+	"""
 	# Positions de départ (x, y)
 	x, y = 300, 380
 
@@ -453,7 +462,27 @@ if __name__ == "__main__":
 	volume = Body([p1, p2, p3, p4], [e1, e2, e3, e4], [], wireframe=False, freeze=True)
 
 	world = World(forces=[gravity], bodies=[body, volume], T = 0.0, h=0.016)
+	"""
 
+	p0 = Point(Vector3(300, 300, 0), Vector3(0,0,0), w=1.0)
+
+	all_points = [p0]
+
+	body = Body(all_points, [], [], wireframe=True, freeze=True)
+	
+	p1 = Point(Vector3(0, 0, 0), Vector3(0,0,0), w=1.0)
+	p2 = Point(Vector3(600, 0, 0), Vector3(0,0,0), w=1.0)
+	p3 = Point(Vector3(600, 50, 0), Vector3(0,0,0), w=1.0)
+	p4 = Point(Vector3(0, 50, 0), Vector3(0,0,0), w=1.0)
+
+	e1 = Edge(p1, p2, 50, 1)
+	e2 = Edge(p2, p3, 50, 1)
+	e3 = Edge(p3, p4, 50, 1)
+	e4 = Edge(p4, p1, 50, 1)
+
+	volume = Body([p1, p2, p3, p4], [e1, e2, e3, e4], [], wireframe=False, freeze=True)
+
+	world = World(forces=[gravity], bodies=[body, volume], T = 0.0, h=0.016)
 
 	running = True
 	last_time = pygame.time.get_ticks() / 1000 # in seconds
@@ -482,12 +511,19 @@ if __name__ == "__main__":
 				
 				for p in all_points:
 					if (p.pos - mouse_v).length() < 15: # Rayon de 15 pixels
-						selected_point = p
-						is_dragging = True
-						# On mémorise si le point était fixe ou non pour le restaurer après
-						p.old_w = p.w 
-						p.w = 0.0 # On le rend "fixe" temporairement pour qu'il suive la souris parfaitement
-						break
+						if event.button == 3:
+							selected_point = p
+							is_dragging = True
+							# On mémorise si le point était fixe ou non pour le restaurer après
+							p.old_w = p.w 
+							p.w = 0.0 # On le rend "fixe" temporairement pour qu'il suive la souris parfaitement
+							break
+						elif event.button == 1:
+							# On envoie une impulsion vers le haut/droite par exemple
+							# Ou on peut calculer le vecteur (Point - Souris) pour "pousser" 
+							world.impulse(p, impulse)
+							break
+							
 			
 			if event.type == pygame.MOUSEBUTTONUP:
 				if is_dragging and selected_point:
@@ -508,6 +544,7 @@ if __name__ == "__main__":
 					# Rotation vers la droite (sens horaire)
 					world.Rotate(world.bodies[1], Vector3(0, 0, -math.radians(10)))
 				
+
 		if is_dragging and selected_point:
 			mx, my = pygame.mouse.get_pos()
 			world_y = screen_height - my

@@ -28,6 +28,7 @@ RagdollEngine:
 ifneq (,$(RagdollEngine_config))
 	@echo "==== Building RagdollEngine ($(RagdollEngine_config)) ===="
 	@${MAKE} --no-print-directory -C . -f RagdollEngine.make config=$(RagdollEngine_config)
+	./bin/Debug/RagdollEngine
 endif
 
 clean:
