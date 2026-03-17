@@ -48,7 +48,11 @@ To simulate articulated skeletons, we use **Distance Constraints** solved via it
 
 * Simple pendulum 
 
-![](C:\Users\simon\Documents\ecole\ei4\s8\projet_info\Ragdoll-Physics-Engine\doc\examples_gif\python\python_pendulum.gif "simple pendulum")
+![](./doc/examples_gif/python/python_pendulum.gif)
+
+* Spring
+
+![](./doc/examples_gif/python/python_spring.gif)
 
 * Drag
 
