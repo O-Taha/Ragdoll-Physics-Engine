@@ -1,5 +1,5 @@
 #include <iostream>
-#include <stdio.h>
+#include <functional>
 #include <vector>
 #include "raylib.h"
 #include "raymath.h"
@@ -17,6 +17,10 @@ make                       ;
 /====================================*/
 
 bool running = false;
+
+class World;
+class Body;
+class Point;
 
 class Point {
     private:
@@ -63,30 +67,71 @@ class Edge {
         void Draw(Color c = RED) {DrawLineV(this->p1.pos_(), this->p2.pos_(), c);}
 };
 
+class Body {
+    public:
+        std::vector<Point*> points;
+        std::vector<Edge*> edges;
+        std::vector<std::function<Vector3(World&, Body&, Point&)>> forces;
+        bool wireframe;
+        bool freeze;
+
+        Body(
+            std::vector<Point*> points,
+            std::vector<Edge*> edges,
+            std::vector<std::function<Vector3(World&, Body&, Point&)>> forces,       
+            bool wireframe,
+            bool freeze
+        ) : points(points), edges(edges), forces(forces), wireframe(wireframe), freeze(freeze) {}
+
+        void Draw() {
+            for (auto& point : this->points) {
+                point->Draw(BLUE);
+            }
+
+            for (auto& edge : this->edges) {
+                edge->Draw(RED);
+            }
+        }
+};
+
+
 int main()
 {
     InitWindow(800, 450, "Ragdoll Engine");
 
     SetTargetFPS(60);
 
-    Point p1({0,20}, {0,0});
-    Point p2({800,400}, {0,0});
-    Edge e(p1, p2);
+    // Créer les 4 points du carré (coordonnées x, y)
+    Point p1({100, 100}, {0, 0});
+    Point p2({200, 100}, {0, 0});
+    Point p3({200, 200}, {0, 0});
+    Point p4({100, 200}, {0, 0});
+
+    // Créer les arêtes du carré
+    Edge e1(p1, p2);
+    Edge e2(p2, p3);
+    Edge e3(p3, p4);
+    Edge e4(p4, p1);
+
+    // Créer un vecteur de pointeurs vers les points et les arêtes
+    std::vector<Point*> points = {&p1, &p2, &p3, &p4};
+    std::vector<Edge*> edges = {&e1, &e2, &e3, &e4};
+
+    // Créer un corps avec ces points et arêtes
+    Body squareBody(points, edges, {}, false, false);
 
     while (!WindowShouldClose())
     {
+
         p1.incrementPos(1);
         p2.incrementPos(-1);
-
         std::cout << "pos: " << p1.pos_().x << std::endl;
         std::cout << "pos2: " << p2.pos_().x << std::endl;
         BeginDrawing();
 
         ClearBackground(RAYWHITE);
-        DrawText("Edge", 150, 200, 20, BLACK);
-        p1.Draw();
-        p2.Draw(BLUE);
-        e.Draw();
+        DrawText("Body", 150, 200, 20, BLACK);
+        squareBody.Draw();
         EndDrawing();
     }
 
