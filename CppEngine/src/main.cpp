@@ -69,7 +69,7 @@ class Body {
         bool wireframe;
         bool freeze;
 
-        Body(
+        Body( // Constructor
             std::vector<Point*> points,
             std::vector<Edge*> edges,
             std::vector<std::function<Vector3(World&, Body&, Point&)>> forces,       
