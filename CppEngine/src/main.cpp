@@ -4,6 +4,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 /*===========[ How to run ]===========
 cd CppEngine/              ;
 #[Wait for container to launch...]
@@ -16,7 +19,7 @@ class World;
 class Body;
 class Point;
 
-class Point {
+class Point {   
     private:
         Vector2 pos;
         Vector2 oldPos;
@@ -90,43 +93,79 @@ class Body {
 
 int main()
 {
-    InitWindow(800, 450, "Ragdoll Engine");
+    const int screenWidth = 800;
+    const int screenHeight = 450;
+
+    InitWindow(screenWidth, screenHeight, "ragdoll");
 
     SetTargetFPS(60);
 
-    // Créer les 4 points du carré (coordonnées x, y)
-    Point p1({100, 100}, {0, 0});
-    Point p2({200, 100}, {0, 0});
-    Point p3({200, 200}, {0, 0});
-    Point p4({100, 200}, {0, 0});
+    char textInput[96] = "test test test";
+    bool textBoxEditMode = false;
 
-    // Créer les arêtes du carré
-    Edge e1(p1, p2);
-    Edge e2(p2, p3);
-    Edge e3(p3, p4);
-    Edge e4(p4, p1);
+    bool btnAddBodyPressed = false;
+    bool btnDeleteBodyPressed = false;
 
-    // Créer un vecteur de pointeurs vers les points et les arêtes
-    std::vector<Point*> points = {&p1, &p2, &p3, &p4};
-    std::vector<Edge*> edges = {&e1, &e2, &e3, &e4};
+    bool btnAddVolumePressed = false;
+    bool btnDeleteVolumePressed = false;
 
-    // Créer un corps avec ces points et arêtes
-    Body squareBody(points, edges, {}, false, false);
+    bool btnConfigGravityPressed = false;
+    bool btnConfigWindPressed = false;
+
+    bool btnConfigBulletPressed = false;
+
+    bool btnRunPressed = false;
 
     while (!WindowShouldClose())
     {
-
-        p1.incrementPos(1);
-        p2.incrementPos(-1);
-        std::cout << "pos: " << p1.pos_().x << std::endl;
-        std::cout << "pos2: " << p2.pos_().x << std::endl;
         BeginDrawing();
+            
+            ClearBackground(RAYWHITE);
+            DrawLine(500, 0, 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.6f));
+            DrawRectangle(500, 0, GetScreenWidth() - 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.3f));
 
-        ClearBackground(RAYWHITE);
-        DrawText("Body", 150, 200, 20, BLACK);
-        squareBody.Draw();
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 24);
+            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
+            GuiSetStyle(LABEL, TEXT_PADDING, 5);
+            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
+            GuiLabel((Rectangle){500, 10, GetScreenWidth() - 500, 32}, "Settings");
+            
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 16);
+            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
+            GuiSetStyle(LABEL, TEXT_PADDING, 5);
+            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
+
+            GuiLabel((Rectangle){500, 30, GetScreenWidth() - 500, 32}, "Bodies & shapes");
+
+            GuiLabel((Rectangle){500, 170, GetScreenWidth() - 500, 32}, "World Environment");
+
+            GuiLabel((Rectangle){500, 310, GetScreenWidth() - 500, 32}, "Bullet");
+
+            GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", nullptr);
+            GuiCheckBox((Rectangle){640, 200, 30, 30}, "Enable Gravity", nullptr);
+            GuiCheckBox((Rectangle){640, 240, 30, 30}, "Enable Wind", nullptr);
+            GuiCheckBox((Rectangle){640, 340, 30, 30}, "Enable Bullet", nullptr);
+
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
+
+            btnAddBodyPressed = GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body");
+            btnDeleteBodyPressed = GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body");
+
+            btnAddVolumePressed = GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume");
+            btnDeleteVolumePressed = GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body");
+            
+            btnConfigGravityPressed = GuiButton((Rectangle){505, 200, 120, 30}, "#142#Config Gravity");
+
+            btnConfigWindPressed = GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind");
+
+            btnConfigBulletPressed = GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet");
+            
+            btnRunPressed = GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run");
+        
         EndDrawing();
     }
 
     CloseWindow();
+    
+    return 0;
 }

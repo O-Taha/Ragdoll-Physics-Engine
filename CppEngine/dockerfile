@@ -37,6 +37,8 @@ RUN make PLATFORM=PLATFORM_DESKTOP \
  && make install \
  && ldconfig
 
+RUN wget https://raw.githubusercontent.com/raysan5/raygui/master/src/raygui.h -O /usr/local/include/raygui.h
+
 WORKDIR /workspace
 
 CMD ["/bin/bash"]
