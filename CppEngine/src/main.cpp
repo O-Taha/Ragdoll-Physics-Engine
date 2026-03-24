@@ -6,14 +6,8 @@
 
 /*===========[ How to run ]===========
 cd CppEngine/              ;
-xhost +local:docker        ;             
-docker compose run --rm dev
-
-[Wait for container to launch...]
-
-premake5 gmake2            ;             
-make                       ;             
-./bin/Debug/RagdollEngine               
+#[Wait for container to launch...]
+make docker-run           
 /====================================*/
 
 bool running = false;
@@ -62,7 +56,7 @@ class Edge {
         float stiff;    // Stiffness
 
         Edge(Point& p1, Point& p2, float l = -1, float s = 1): p1(p1), p2(p2), len(l), stiff(s) {
-            if (l == -1) this -> len = Vector2Distance(p1.pos_(), p2.pos_());
+            if (l == -1) this -> len = Vector2Distance(p1.pos_(), p2.pos_()); // if no resting length is provided, compute it based on distance between points
         }
         void Draw(Color c = RED) {DrawLineV(this->p1.pos_(), this->p2.pos_(), c);}
 };
@@ -87,13 +81,12 @@ class Body {
             for (auto& point : this->points) {
                 point->Draw(BLUE);
             }
-
             for (auto& edge : this->edges) {
                 edge->Draw(RED);
             }
         }
 };
-
+/* TODO ADD body.md !!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
 int main()
 {
