@@ -5,6 +5,7 @@ import math
 
 running: bool = False
 
+
 class Point:
 	def __init__(self, pos: Vector3, vel: Vector3, w: float = 1.0):
 		self._pos:			Vector3	= pos		# DO NOT REMOVE '_' OR ELSE : RecursionError: maximum recursion depth exceeded
@@ -147,48 +148,56 @@ class World:
 		A = volume.points[0].pos
 		B = volume.points[1].pos
 		D = volume.points[3].pos
+		E = volume.points[4].pos
 
 		# Vecteurs directeurs
 		u = B - A
 		v = D - A
+		w = E - A # Axe Z
 		ap = p.pos - A
 
 		# Carrés des longueurs (pour éviter sqrt)
 		u_len_sq = u.length_squared()
 		v_len_sq = v.length_squared()
+		w_len_sq = w.length_squared()
 
-		if u_len_sq == 0 or v_len_sq == 0: return
+		if u_len_sq == 0 or v_len_sq == 0 or w_len_sq == 0: return
 
 		# Projections normalisées (0.0 à 1.0)
 		mu = ap.dot(u) / u_len_sq
 		mv = ap.dot(v) / v_len_sq
+		mw = ap.dot(w) / w_len_sq
 
 		# Test d'inclusion
-		if 0 <= mu <= 1 and 0 <= mv <= 1:
-			# On stocke la position AVANT la répulsion
-			old_pos_before_correction = Vector3(p.pos)
+		if 0 <= mu <= 1 and 0 <= mv <= 1 and 0 <= mw <= 1:
 			# On calcule les distances aux bords (en unités normalisées)
 			# Mais pour repousser, on repasse en pixels
-			dist_left   = mu * u.length()
-			dist_right  = (1 - mu) * u.length()
+			dist_left = mu * u.length()
+			dist_right = (1 - mu) * u.length()
 			dist_bottom = mv * v.length()
-			dist_top    = (1 - mv) * v.length()
+			dist_top = (1 - mv) * v.length()
+			dist_back = mw * w.length()
+			dist_front = (1 - mw) * w.length()
 
-			min_d = min(dist_left, dist_right, dist_bottom, dist_top)
+			min_d = min(dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front)
 
-			# Repousse le point selon l'axe local
+			# Repulsion
 			if min_d == dist_left:
 				p.pos -= u.normalize() * dist_left
 			elif min_d == dist_right:
 				p.pos += u.normalize() * dist_right
 			elif min_d == dist_bottom:
 				p.pos -= v.normalize() * dist_bottom
-			else:
+			elif min_d == dist_top:
 				p.pos += v.normalize() * dist_top
+			elif min_d == dist_back:
+				p.pos -= w.normalize() * dist_back
+			else:
+				p.pos += w.normalize() * dist_front
 				
 			# Friction
 			velocity_vector = p.pos - p._old_pos
-			p._old_pos += velocity_vector * (1 - 0.1)
+			p._old_pos = p.pos - velocity_vector * 0.9
 
 	def constraint(self, edge: Edge):
 		
@@ -252,6 +261,7 @@ class World:
 			total_force += f(self, body, point)
 
 		return total_force * point.w
+
 
 if __name__ == "__main__":
 	pygame.init()
@@ -464,25 +474,52 @@ if __name__ == "__main__":
 	world = World(forces=[gravity], bodies=[body, volume], T = 0.0, h=0.016)
 	"""
 
+	# --- POINTS DU CORPS (Le point qui tombe) ---
+	# On le place bien au milieu de l'épaisseur Z du volume (Z=0)
 	p0 = Point(Vector3(300, 300, 0), Vector3(0,0,0), w=1.0)
-
 	all_points = [p0]
+	body = Body([p0], [], [], wireframe=True, freeze=True)
 
-	body = Body(all_points, [], [], wireframe=True, freeze=True)
-	
-	p1 = Point(Vector3(0, 0, 0), Vector3(0,0,0), w=1.0)
-	p2 = Point(Vector3(600, 0, 0), Vector3(0,0,0), w=1.0)
-	p3 = Point(Vector3(600, 50, 0), Vector3(0,0,0), w=1.0)
-	p4 = Point(Vector3(0, 50, 0), Vector3(0,0,0), w=1.0)
+	# --- POINTS DU VOLUME (Le sol) ---
+	# On définit une boîte : X(0-600), Y(0-50), Z(-100 à 100)
+	# Face Arrière (Z = -100)
+	p1 = Point(Vector3(0, 0, -100),   Vector3(0,0,0)) # A : Origine
+	p2 = Point(Vector3(600, 0, -100), Vector3(0,0,0)) # B : Axe X
+	p3 = Point(Vector3(600, 50, -100),Vector3(0,0,0)) # C
+	p4 = Point(Vector3(0, 50, -100),  Vector3(0,0,0)) # D : Axe Y
+	# Face Avant (Z = 100)
+	p5 = Point(Vector3(0, 0, 100),    Vector3(0,0,0)) # E : Axe Z
+	p6 = Point(Vector3(600, 0, 100),  Vector3(0,0,0))
+	p7 = Point(Vector3(600, 50, 100), Vector3(0,0,0))
+	p8 = Point(Vector3(0, 50, 100),   Vector3(0,0,0))
 
-	e1 = Edge(p1, p2, 50, 1)
-	e2 = Edge(p2, p3, 50, 1)
-	e3 = Edge(p3, p4, 50, 1)
-	e4 = Edge(p4, p1, 50, 1)
+	all_volume_points = [p1, p2, p3, p4, p5, p6, p7, p8]
+	# Wireframe=False pour que le World le considère comme un obstacle solide
+	def create_edge(pa, pb, stiffness=1.0):
+		dist = (pa.pos - pb.pos).length()
+		return Edge(pa, pb, dist, stiffness)
 
-	volume = Body([p1, p2, p3, p4], [e1, e2, e3, e4], [], wireframe=False, freeze=True)
+	# --- ARÊTES DU VOLUME (12 segments) ---
+	volume_edges = [
+		# Face arrière (Z = -100) : Reliant p1, p2, p3, p4
+		create_edge(p1, p2), create_edge(p2, p3), 
+		create_edge(p3, p4), create_edge(p4, p1),
 
-	world = World(forces=[gravity], bodies=[body, volume], T = 0.0, h=0.016)
+		# Face avant (Z = 100) : Reliant p5, p6, p7, p8
+		create_edge(p5, p6), create_edge(p6, p7), 
+		create_edge(p7, p8), create_edge(p8, p5),
+
+		# Liaisons entre arrière et avant (Profondeur)
+		create_edge(p1, p5), # Bas-Gauche
+		create_edge(p2, p6), # Bas-Droite
+		create_edge(p3, p7), # Haut-Droite
+		create_edge(p4, p8)  # Haut-Gauche
+	]
+
+	# Mise à jour de l'objet volume
+	volume = Body(all_volume_points, volume_edges, [], wireframe=False, freeze=True)
+
+	world = World(forces=[gravity], bodies=[body, volume], T=0.0, h=0.016)
 
 	running = True
 	last_time = pygame.time.get_ticks() / 1000 # in seconds
