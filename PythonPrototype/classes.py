@@ -110,7 +110,7 @@ class World:
 		h = h or self.h
 		self.h = h
 		for body in self.bodies:
-			if not body.wireframe: return
+			if not body.wireframe: continue
 
 			if not body.freeze:
 				for p in body.points:
