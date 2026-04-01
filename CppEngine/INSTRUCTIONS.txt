@@ -1,3 +1,5 @@
-git clone <repo>
-cd RagdollEngine/CppEngine
-make docker-run  # build via Docker puis lancement de l'exécutable
+1. git clone <repo>
+2. cd RagdollEngine/CppEngine
+3. lancer l'application docker desktop
+4. docker compose up --build
+5. make docker-run  # build via Docker puis lancement de l'exécutable

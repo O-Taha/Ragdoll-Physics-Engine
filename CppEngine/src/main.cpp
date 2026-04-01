@@ -91,6 +91,17 @@ class Body {
 };
 /* TODO ADD body.md !!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 
+void run(){}
+void addBody(){}
+void deleteBody(){}
+void addVolume(){}
+void deleteVolume(){}
+
+void enableGround(){}
+void enableGravity(){}
+void enableWind(){}
+void enableBullet(){}
+
 int main()
 {
     const int screenWidth = 800;
@@ -103,6 +114,12 @@ int main()
     char textInput[96] = "test test test";
     bool textBoxEditMode = false;
 
+    bool boxEnableGround = false;
+    bool boxEnableGravity = false;
+    bool boxEnableWind = false;
+    bool boxEnableBullet = false;
+
+
     bool btnAddBodyPressed = false;
     bool btnDeleteBodyPressed = false;
 
@@ -111,15 +128,23 @@ int main()
 
     bool btnConfigGravityPressed = false;
     bool btnConfigWindPressed = false;
-
     bool btnConfigBulletPressed = false;
+
+    bool btnConfigGravityWindow = false;
+    bool btnConfigWindWindow = false;
+    bool btnConfigBulletWindow = false;
 
     bool btnRunPressed = false;
 
     while (!WindowShouldClose())
     {
+        if(boxEnableGround) enableGround();
+        if(boxEnableGravity) enableGravity();
+        if(boxEnableWind) enableWind();
+        if(boxEnableBullet) enableBullet();
+        
         BeginDrawing();
-            
+
             ClearBackground(RAYWHITE);
             DrawLine(500, 0, 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.6f));
             DrawRectangle(500, 0, GetScreenWidth() - 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.3f));
@@ -141,27 +166,41 @@ int main()
 
             GuiLabel((Rectangle){500, 310, GetScreenWidth() - 500, 32}, "Bullet");
 
-            GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", nullptr);
-            GuiCheckBox((Rectangle){640, 200, 30, 30}, "Enable Gravity", nullptr);
-            GuiCheckBox((Rectangle){640, 240, 30, 30}, "Enable Wind", nullptr);
-            GuiCheckBox((Rectangle){640, 340, 30, 30}, "Enable Bullet", nullptr);
+            GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround);
+            GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
+            GuiCheckBox((Rectangle){640, 240, 20, 20}, "Enable Wind", &boxEnableWind);
+            GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
 
             GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
 
-            btnAddBodyPressed = GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body");
-            btnDeleteBodyPressed = GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body");
+            if(GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body")) addBody();
+            if(GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body")) deleteBody();
 
-            btnAddVolumePressed = GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume");
-            btnDeleteVolumePressed = GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body");
+            if(GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume")) addVolume();
+            if(GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body")) deleteVolume();
             
-            btnConfigGravityPressed = GuiButton((Rectangle){505, 200, 120, 30}, "#142#Config Gravity");
+            if(GuiButton((Rectangle){505, 200, 120, 30}, "#142#Config Gravity")) btnConfigGravityWindow = !btnConfigGravityWindow;
 
-            btnConfigWindPressed = GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind");
+            if(btnConfigGravityWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
 
-            btnConfigBulletPressed = GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet");
+            if(GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind")) btnConfigWindWindow = !btnConfigWindWindow;
+
+            if(btnConfigWindWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
+
+            if(GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet")) btnConfigBulletWindow = !btnConfigBulletWindow;
+
+            if(btnConfigBulletWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
             
-            btnRunPressed = GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run");
-        
+            if(GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run")) run();
         EndDrawing();
     }
 
