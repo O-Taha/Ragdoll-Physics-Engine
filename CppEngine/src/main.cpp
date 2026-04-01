@@ -33,8 +33,18 @@ int currentScene = 0;
 World* world = nullptr;
 
 Point* selectedPoint = nullptr;
-bool isDragging = false;
+Point* selectedTarget = nullptr;
+//bool isDragging = false;
 float grabRadius = 15.0f;
+
+enum mouseMode {
+    IDLE, // NO INFLUENCE ON SCREEN
+    DRAGGING, // TO DRAG POINTS ACCROSS THE SCREEN
+    TARGETING, // TO TARGET A POINT TO SHOOT IT
+    PLACING // TO PLACE A BODY
+};
+
+mouseMode mouseState = IDLE; 
 
 // Globale pour GUI
 
@@ -58,6 +68,9 @@ bool btnConfigGravityWindow = false;
 bool btnConfigWindWindow = false;
 bool btnConfigBulletWindow = false;
 
+bool btnSelectTarget = false;
+bool btnShootTarget = false;
+
 bool btnRunPressed = false;
 
 bool textBoxGravityEditMode = false;
@@ -72,8 +85,17 @@ char textWindYInput[16] = "0";
 bool textBoxWindZEditMode = false;
 char textWindZInput[16] = "0";
 
+bool textBoxBulletXEditMode = false;
+char textBulletXInput[16] = "0";
 
-void run(){}
+bool textBoxBulletYEditMode = false;
+char textBulletYInput[16] = "0";
+
+bool textBoxBulletZEditMode = false;
+char textBulletZInput[16] = "0";
+
+Vector3 impulseBuf = Vector3{0.0f, 0.0f, 0.0f};
+
 void addBody(){}
 void deleteBody(){}
 void addVolume(){}
@@ -133,6 +155,13 @@ class Point {
         void owner_(Body* b)            { owner = b; }
 
         void Draw(Color c = RED) {DrawCircleV(worldToScreen(pos), 5, c);}
+
+        void impulse(const Vector3& impulseForce) {
+            if(w == 0.0f) return;
+
+            vel += impulseForce;
+        }
+
 };
 
 class Edge {
@@ -182,6 +211,7 @@ class Body {
 std::vector<Body*> Body::bodies;
 
 class World {
+    public:
     std::vector<Body*> bodies;
     float t;    // time
     float h;    // time-step
@@ -414,11 +444,12 @@ void loadPendulum()
     Body* body = new Body({p1, p2}, {e1}, {}, true, false);
 
     world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
+
 }
 
-void loadRagdoll()
+void loadBody(const Vector3& mousePos)
 {
-    float x = 400, y = 350;
+    float x = mousePos.x, y = mousePos.y;
 
     Point* head = new Point({x, y, 0}, {0,0,0}, 1.0f);
     Point* torso = new Point({x, y-60, 0}, {0,0,0}, 1.0f);
@@ -450,7 +481,12 @@ void loadRagdoll()
 
     Body* body = new Body(pts, edges, {}, true, false);
 
-    // ----- SOL -----
+    world->bodies.push_back(body);
+}
+
+void loadGround()
+{
+        // ----- SOL -----
     Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
     Point* s2 = new Point({800, 0, 0}, {0,0,0}, 0.0f);
     Point* s3 = new Point({800, 50, 0}, {0,0,0}, 0.0f);
@@ -488,8 +524,8 @@ void deleteAllBodies(){
 void loadScene(int scene)
 {
     selectedPoint = nullptr;
-    isDragging = false;
-
+    //isDragging = false;
+    mouseState = IDLE;
     
     if (world != nullptr) {
         delete world;
@@ -500,7 +536,7 @@ void loadScene(int scene)
     switch(scene)
     {
         case PENDULUM: loadPendulum(); break;
-        case RAGDOLL:  loadRagdoll();  break;
+        case RAGDOLL:  loadGround();  break;
     }
 }
 
@@ -517,37 +553,55 @@ int main()
         float dt = GetFrameTime();
         dt = fminf(dt, 0.016f);
 
-        if (IsKeyPressed(KEY_SPACE)) {
-            running = !running;
-        }
-
         if (running) {
             Vector2 mouse = GetMousePosition();
 
                 // -------- INPUT --------
             if (IsKeyPressed(KEY_RIGHT)) {
-                isDragging = false;
+                //isDragging = false;
+                mouseState = IDLE;
                 selectedPoint = nullptr;
                 currentScene = (currentScene + 1) % SCENE_COUNT;
                 loadScene(currentScene);
             }
 
             if (IsKeyPressed(KEY_LEFT)) {
-                isDragging = false;
+                //isDragging = false;
+                mouseState = IDLE;
                 selectedPoint = nullptr;
                 currentScene = (currentScene - 1 + SCENE_COUNT) % SCENE_COUNT;
                 loadScene(currentScene);
             }
 
+            //if (IsKeyPressed(KEY_K)) {
+            //    std::cout << "impulse" << std::endl;
+            //    world->bodies[0]->points[1]->impulse(Vector3{500, 0, 0});
+            //}
+
             // CLICK
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
+                std::cout << mouseState << std::endl;
                 selectedPoint = getPointUnderCursor(mouse);
-
-                if (selectedPoint)
+                if (mouseState == PLACING){
+                        loadBody(screenToWorld(mouse));
+                        std::cout << "Placing body" << std::endl;
+                        mouseState = IDLE;
+                }
+                else if (selectedPoint)
                 {
-                    isDragging = true;
-                    selectedPoint->invW_(0.0f); // fixe temporairement
+                    //isDragging = true;
+                    if(mouseState == IDLE){
+                        mouseState = DRAGGING;
+                        selectedPoint->invW_(0.0f); // fixe temporairement
+                        std::cout << "Dragging point" << std::endl;
+                    }
+                    else if (mouseState == TARGETING){
+                        selectedTarget = selectedPoint;
+                        std::cout << selectedPoint->pos_().x << selectedPoint->pos_().y << std::endl;
+                        mouseState = IDLE;
+                        std::cout << "Targetting point" << std::endl;
+                    }
                 }
             }
 
@@ -559,11 +613,12 @@ int main()
                     selectedPoint->invW_(selectedPoint->oldW_());
                 }
                 selectedPoint = nullptr;
-                isDragging = false;
+                //isDragging = false;
+                if(mouseState != TARGETING && mouseState != PLACING) mouseState = IDLE;
             }
 
             // DRAG
-            if (isDragging && selectedPoint)
+            if (mouseState == DRAGGING && selectedPoint)
             {
                 Vector3 m = screenToWorld(mouse);
 
@@ -584,9 +639,7 @@ int main()
         if(boxEnableBullet) enableBullet();
       
         // -------- DRAW --------
-        
-        
-      
+    
         BeginDrawing();
         ClearBackground(RAYWHITE);
       
@@ -617,7 +670,15 @@ int main()
 
             GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
 
-            if(GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body")) addBody();
+            if(GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body")) btnAddBodyPressed = !btnAddBodyPressed;
+
+            if(btnAddBodyPressed)
+            {
+                mouseState = PLACING;
+                btnAddBodyPressed = false;
+                std::cout << "MODE PLACING" << std::endl;
+            }
+
             if(GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body")) deleteBody();
 
             if(GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume")) addVolume();
@@ -670,16 +731,43 @@ int main()
             if(btnConfigBulletWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+                // Selection du point
+                if(GuiButton((Rectangle){150, 100, 120, 30}, "#142#Select Target")) btnSelectTarget = !btnSelectTarget;
+
+                    if(btnSelectTarget)
+                    {
+                        mouseState = TARGETING;
+                        std::cout << "MODE TARGET" << std::endl;
+
+                        btnSelectTarget = false;
+
+                    }
+
+                if(GuiValueBoxFloat((Rectangle){150, 200, 100, 20}, "x", textBulletXInput, &impulseBuf.x, textBoxBulletXEditMode)) textBoxBulletXEditMode = !textBoxBulletXEditMode;
+                if(GuiValueBoxFloat((Rectangle){150, 250, 100, 20}, "y", textBulletYInput, &impulseBuf.y, textBoxBulletYEditMode)) textBoxBulletYEditMode = !textBoxBulletYEditMode;
+                if(GuiValueBoxFloat((Rectangle){150, 300, 100, 20}, "z", textBulletZInput, &impulseBuf.z, textBoxBulletZEditMode)) textBoxBulletZEditMode = !textBoxBulletZEditMode;
+                
+                if(GuiButton((Rectangle){150, 150, 120, 30}, "#142#Shoot Target")) btnShootTarget = !btnShootTarget;
+
+                    if(btnShootTarget)
+                    {
+                        if(selectedTarget) selectedTarget->impulse(impulseBuf);
+
+                        btnShootTarget = false;
+                    }
+                
             }
             
-            if(GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run")) run();
+            if(GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run")) running = !running;
       
         // -------
 
-             for (auto b : Body::bodies)
-                b->Draw();
+            for (auto b : Body::bodies) b->Draw();
+            
+            if(selectedTarget) selectedTarget->Draw(GREEN);
 
-              DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
+            DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
+            
 
         EndDrawing();
     }
@@ -688,3 +776,20 @@ int main()
     
     return 0;
 }
+
+
+/*
+TO DO
+
+Convertir les boutons qu'il faut en bouton toggle
+Text box en value box
+Tester les limites du bouton run 
+Mettre en forme
+Delete Body
+
+Add volume
+
+Delete Volume
+
+
+*/
