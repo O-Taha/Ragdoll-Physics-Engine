@@ -1,4 +1,5 @@
 #include <iostream>
+#include <string>
 #include <functional>
 #include <vector>
 #include "raylib.h"
@@ -34,6 +35,57 @@ World* world = nullptr;
 Point* selectedPoint = nullptr;
 bool isDragging = false;
 float grabRadius = 15.0f;
+
+// Globale pour GUI
+
+bool boxEnableGround = false;
+bool boxEnableGravity = true;
+bool boxEnableWind = false;
+bool boxEnableBullet = false;
+
+
+bool btnAddBodyPressed = false;
+bool btnDeleteBodyPressed = false;
+
+bool btnAddVolumePressed = false;
+bool btnDeleteVolumePressed = false;
+
+bool btnConfigGravityPressed = false;
+bool btnConfigWindPressed = false;
+bool btnConfigBulletPressed = false;
+
+bool btnConfigGravityWindow = false;
+bool btnConfigWindWindow = false;
+bool btnConfigBulletWindow = false;
+
+bool btnRunPressed = false;
+
+bool textBoxGravityEditMode = false;
+char textGravityInput[16] = "-9.81";
+
+bool textBoxWindXEditMode = false;
+char textWindXInput[16] = "0";
+
+bool textBoxWindYEditMode = false;
+char textWindYInput[16] = "0";
+
+bool textBoxWindZEditMode = false;
+char textWindZInput[16] = "0";
+
+
+void run(){}
+void addBody(){}
+void deleteBody(){}
+void addVolume(){}
+void deleteVolume(){}
+
+void enableGround(){}
+void enableGravity(){}
+void enableWind(){}
+void enableBullet(){}
+
+//
+
 
 inline Vector2 toVector2(const Vector3& v) {return {v.x, v.y};}
 inline Vector2 worldToScreen(const Vector3& v) {return {v.x, (float)GetScreenHeight() - v.y};}
@@ -134,6 +186,9 @@ class World {
     float t;    // time
     float h;    // time-step
     float T;    // Full sim duration
+    float gravity;
+    Vector3 wind;
+
     std::vector<float> recordTime;
 
     void applyVerlet(Point& p) {
@@ -261,7 +316,22 @@ class World {
     public:
         std::vector<std::function<Vector3(World&, Body&, Point&)>> globalForces;
 
-        World(std::vector<std::function<Vector3(World&, Body&, Point&)>> forces, std::vector<Body*> bodies, float T = 0, float h = 1.0): globalForces(forces), bodies(bodies), t(0), T(T), h(h){}
+        World(std::vector<std::function<Vector3(World&, Body&, Point&)>> forces, std::vector<Body*> bodies, float T = 0, float h = 1.0, float gravity = -9.81, Vector3 wind = Vector3{0.0f, 0.0f, 0.0f}): globalForces(forces), bodies(bodies), t(0), T(T), h(h), gravity(gravity), wind(wind){}
+        
+        const float& gravity_() const     { return gravity; }
+        void gravity_(const float& g)     { gravity = g; }
+
+        const Vector3& wind_() const     { return wind; }
+        void wind_(const Vector3& w)     { wind = w; }
+
+        const float& windX_() const     { return wind.x; }
+        void windX_(const float& wx)     { wind.x = wx; }
+
+        const float& windY_() const     { return wind.y; }
+        void windY_(const float& wy)     { wind.y = wy; }
+
+        const float& windZ_() const     { return wind.z; }
+        void windZ_(const float& wz)     { wind.z = wz; }
 
         void runStep(float dt = -1) {
             h = (dt <= 0)? h : dt; // if no time-step provided, default to class member h
@@ -316,10 +386,22 @@ Point* getPointUnderCursor(Vector2 mouse)
 
 auto gravity = [](World& world, Body& body, Point& point) -> Vector3
 {
+    if(!boxEnableGravity) return Vector3{0.0f, 0.0f, 0.0f};
+    
     if (point.w_() == 0.0f)
         return Vector3{0.0f, 0.0f, 0.0f};
 
-    return Vector3{0.0f, (-9.81f * 100.0f) / point.w_(), 0.0f};
+    return Vector3{0.0f, (world.gravity_() * 100.0f) / point.w_(), 0.0f};
+};
+
+auto wind = [](World& world, Body& body, Point& point) -> Vector3
+{
+    if(!boxEnableWind) return Vector3{0.0f, 0.0f, 0.0f};
+    
+    if (point.w_() == 0.0f)
+        return Vector3{0.0f, 0.0f, 0.0f};
+
+    return world.wind_() * 100.0f;
 };
 
 void loadPendulum()
@@ -330,9 +412,8 @@ void loadPendulum()
     Edge* e1 = new Edge(*p1, *p2, 100.0f, 1.0f);
 
     Body* body = new Body({p1, p2}, {e1}, {}, true, false);
-    body->forces.push_back(gravity);
 
-    world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
+    world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
 }
 
 void loadRagdoll()
@@ -368,7 +449,6 @@ void loadRagdoll()
     };
 
     Body* body = new Body(pts, edges, {}, true, false);
-    body->forces.push_back(gravity);
 
     // ----- SOL -----
     Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
@@ -389,7 +469,7 @@ void loadRagdoll()
         true    // freeze
     );
 
-    world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
+    world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
 }
 
 // ----------------------
@@ -423,43 +503,6 @@ void loadScene(int scene)
         case RAGDOLL:  loadRagdoll();  break;
     }
 }
-
-char textInput[96] = "test test test";
-bool textBoxEditMode = false;
-
-bool boxEnableGround = false;
-bool boxEnableGravity = false;
-bool boxEnableWind = false;
-bool boxEnableBullet = false;
-
-
-bool btnAddBodyPressed = false;
-bool btnDeleteBodyPressed = false;
-
-bool btnAddVolumePressed = false;
-bool btnDeleteVolumePressed = false;
-
-bool btnConfigGravityPressed = false;
-bool btnConfigWindPressed = false;
-bool btnConfigBulletPressed = false;
-
-bool btnConfigGravityWindow = false;
-bool btnConfigWindWindow = false;
-bool btnConfigBulletWindow = false;
-
-bool btnRunPressed = false;
-
-
-void run(){}
-void addBody(){}
-void deleteBody(){}
-void addVolume(){}
-void deleteVolume(){}
-
-void enableGround(){}
-void enableGravity(){}
-void enableWind(){}
-void enableBullet(){}
 
 
 int main()
@@ -585,6 +628,13 @@ int main()
             if(btnConfigGravityWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+                if (GuiTextBox((Rectangle){ 40, 64, 720, 32 }, textGravityInput, 95, textBoxGravityEditMode))
+                {
+                    textBoxGravityEditMode = !textBoxGravityEditMode;
+                    
+                    world->gravity_(std::stof(textGravityInput));
+                    std::cout << world->gravity_() << std::endl;
+                }
             }
 
             if(GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind")) btnConfigWindWindow = !btnConfigWindWindow;
@@ -592,6 +642,27 @@ int main()
             if(btnConfigWindWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+                if (GuiTextBox((Rectangle){ 40, 64, 720, 32 }, textWindXInput, 95, textBoxWindXEditMode))
+                {
+                    textBoxWindXEditMode = !textBoxWindXEditMode;
+                    
+                    world->windX_(std::stof(textWindXInput));
+                    std::cout << world->windX_() << std::endl;
+                }
+                if (GuiTextBox((Rectangle){ 40, 100, 720, 32 }, textWindYInput, 95, textBoxWindYEditMode))
+                {
+                    textBoxWindYEditMode = !textBoxWindYEditMode;
+                    
+                    world->windY_(std::stof(textWindYInput));
+                    std::cout << world->windY_() << std::endl;
+                }
+                if (GuiTextBox((Rectangle){ 40, 160, 720, 32 }, textWindZInput, 95, textBoxWindZEditMode))
+                {
+                    textBoxWindZEditMode = !textBoxWindZEditMode;
+                    
+                    world->windZ_(std::stof(textWindZInput));
+                    std::cout << world->windZ_() << std::endl;
+                }
             }
 
             if(GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet")) btnConfigBulletWindow = !btnConfigBulletWindow;
