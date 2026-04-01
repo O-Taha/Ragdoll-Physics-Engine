@@ -1,4 +1,5 @@
 workspace "RagdollEngine"
+    location "build"
     architecture "x64"
     configurations { "Debug", "Release" }
 
@@ -12,26 +13,17 @@ project "RagdollEngine"
 
     files { "src/**.cpp" }
 
-    includedirs {
-        "/usr/local/include"
-    }
-
-    libdirs {
-        "/usr/local/lib"
-    }
-
-    links {
-        "raylib",
-        "GL",
-        "m",
-        "pthread",
-        "dl",
-        "rt",
-        "X11"
-    }
+    includedirs { "/usr/local/include" }
+    libdirs { "/usr/local/lib" }
+    links { "raylib", "GL", "m", "pthread", "dl", "rt", "X11" }
 
     filter "configurations:Debug"
         symbols "On"
 
     filter "configurations:Release"
         optimize "On"
+    
+    filter "system:linux"
+    buildoptions {
+        "-fdebug-prefix-map=" .. os.getcwd() .. "=."
+    }
