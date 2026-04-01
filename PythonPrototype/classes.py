@@ -1,13 +1,15 @@
 from typing import List, Tuple, Callable
 import pygame
 from pygame.math import Vector2, Vector3
+import math
 
 running: bool = False
+
 
 class Point:
 	def __init__(self, pos: Vector3, vel: Vector3, w: float = 1.0):
 		self._pos:			Vector3	= pos		# DO NOT REMOVE '_' OR ELSE : RecursionError: maximum recursion depth exceeded
-		self._old_pos:		Vector3 = pos
+		self._old_pos:		Vector3 = Vector3(pos)
 		self.vel:			Vector3	= vel
 		self.acc:			Vector3	= 0
 		self.w:				float	= w			# inverse of weight
@@ -33,7 +35,7 @@ class Body:
 	def __init__(self, points: List[Point], edges: List[Edge], forces: List[Callable], wireframe: bool, freeze: bool,):
 		self.points: List[Point] = points
 		self.edges: List[Edge] = edges
-		self.forces: List[Callable] = forces
+		self.forces: List[Callable] = forces	
 		self.wireframe: bool = wireframe
 		self.freeze: bool = freeze
 
@@ -110,7 +112,7 @@ class World:
 		h = h or self.h
 		self.h = h
 		for body in self.bodies:
-			if not body.wireframe: return
+			if not body.wireframe: continue
 
 			if not body.freeze:
 				for p in body.points:
@@ -146,48 +148,56 @@ class World:
 		A = volume.points[0].pos
 		B = volume.points[1].pos
 		D = volume.points[3].pos
+		E = volume.points[4].pos
 
 		# Vecteurs directeurs
 		u = B - A
 		v = D - A
+		w = E - A # Axe Z
 		ap = p.pos - A
 
 		# Carrés des longueurs (pour éviter sqrt)
 		u_len_sq = u.length_squared()
 		v_len_sq = v.length_squared()
+		w_len_sq = w.length_squared()
 
-		if u_len_sq == 0 or v_len_sq == 0: return
+		if u_len_sq == 0 or v_len_sq == 0 or w_len_sq == 0: return
 
 		# Projections normalisées (0.0 à 1.0)
 		mu = ap.dot(u) / u_len_sq
 		mv = ap.dot(v) / v_len_sq
+		mw = ap.dot(w) / w_len_sq
 
 		# Test d'inclusion
-		if 0 <= mu <= 1 and 0 <= mv <= 1:
-			# On stocke la position AVANT la répulsion
-			old_pos_before_correction = Vector3(p.pos)
+		if 0 <= mu <= 1 and 0 <= mv <= 1 and 0 <= mw <= 1:
 			# On calcule les distances aux bords (en unités normalisées)
 			# Mais pour repousser, on repasse en pixels
-			dist_left   = mu * u.length()
-			dist_right  = (1 - mu) * u.length()
+			dist_left = mu * u.length()
+			dist_right = (1 - mu) * u.length()
 			dist_bottom = mv * v.length()
-			dist_top    = (1 - mv) * v.length()
+			dist_top = (1 - mv) * v.length()
+			dist_back = mw * w.length()
+			dist_front = (1 - mw) * w.length()
 
-			min_d = min(dist_left, dist_right, dist_bottom, dist_top)
+			min_d = min(dist_left, dist_right, dist_bottom, dist_top, dist_back, dist_front)
 
-			# Repousse le point selon l'axe local
+			# Repulsion
 			if min_d == dist_left:
 				p.pos -= u.normalize() * dist_left
 			elif min_d == dist_right:
 				p.pos += u.normalize() * dist_right
 			elif min_d == dist_bottom:
 				p.pos -= v.normalize() * dist_bottom
-			else:
+			elif min_d == dist_top:
 				p.pos += v.normalize() * dist_top
+			elif min_d == dist_back:
+				p.pos -= w.normalize() * dist_back
+			else:
+				p.pos += w.normalize() * dist_front
 				
 			# Friction
 			velocity_vector = p.pos - p._old_pos
-			p._old_pos += velocity_vector * (1 - 0.1)
+			p._old_pos = p.pos - velocity_vector * 0.9
 
 	def constraint(self, edge: Edge):
 		
@@ -202,7 +212,45 @@ class World:
 		err = (d.length() - edge.l)/d.length()
 		edge.points[0].pos = edge.points[0].pos + edge.s * (edge.points[0].w / (edge.points[0].w + edge.points[1].w)) * err * d
 		edge.points[1].pos = edge.points[1].pos - edge.s * (edge.points[1].w / (edge.points[0].w + edge.points[1].w)) * err * d
+
+	def Move(self, point: Point, newPos: Vector3):
+		pass
+
+	# rotate the body of an angle = (alpha, beta, theta) °, aplha is between xy, beta yz, theta zx
+	def Rotate(self, body: Body, angle: Vector3):
+		center = Vector3(0, 0, 0)
+		total_mass = 0
+		for p in body.points:
+			if p.w == 0: continue # On ignore les points infinis ou on leur donne un poids arbitraire
+			m = 1.0 / p.w
+			center += p.pos * m
+			total_mass += m
+
+		if total_mass == 0: return # Sécurité
+		center /= total_mass
+
+		cos_a = math.cos(angle.z)
+		sin_a = math.sin(angle.z)
+
+		for p in body.points:
+			rel_x = p.pos.x - center.x
+			rel_y = p.pos.y - center.y
+			#rel_z = p.pos.z - center.z
+
+			# rotation
+			new_x = rel_x * cos_a - rel_y * sin_a
+			new_y = rel_x * sin_a + rel_y * cos_a
+
+			# pour du statique, c'est pour ca qu'on met a la fois pour l'ancienne position (vitesse nulle)
+			p.pos.x = new_x + center.x
+			p.pos.y = new_y + center.y
+			p._old_pos.x = new_x + center.x
+			p._old_pos.y = new_y + center.y
 		
+	def impulse(self, p: Point, impulseForce: Vector3):
+		if p.w == 0: return
+
+		p.vel += impulseForce
 
 	def computeAccel(self, body: Body, point: Point) -> Vector3:
 		total_force = Vector3(0,0,0)
@@ -214,6 +262,7 @@ class World:
 
 		return total_force * point.w
 
+
 if __name__ == "__main__":
 	pygame.init()
 	screen_width, screen_height = 600, 400
@@ -223,6 +272,9 @@ if __name__ == "__main__":
 
 	# Gravité vers le bas (axe Y négatif)
 	g = Vector3(0, -9.81, 0)
+
+	# impulsion pour tester
+	impulse = Vector3(0, 500, 0)
 
 	"""
 	#pendule
@@ -326,6 +378,7 @@ if __name__ == "__main__":
 
 	e1 = Edge(p1, p2, l=100.0, s=0.1)"""
 
+	"""
 	# Positions de départ (x, y)
 	x, y = 300, 380
 
@@ -419,7 +472,54 @@ if __name__ == "__main__":
 	volume = Body([p1, p2, p3, p4], [e1, e2, e3, e4], [], wireframe=False, freeze=True)
 
 	world = World(forces=[gravity], bodies=[body, volume], T = 0.0, h=0.016)
+	"""
 
+	# --- POINTS DU CORPS (Le point qui tombe) ---
+	# On le place bien au milieu de l'épaisseur Z du volume (Z=0)
+	p0 = Point(Vector3(300, 300, 0), Vector3(0,0,0), w=1.0)
+	all_points = [p0]
+	body = Body([p0], [], [], wireframe=True, freeze=True)
+
+	# --- POINTS DU VOLUME (Le sol) ---
+	# On définit une boîte : X(0-600), Y(0-50), Z(-100 à 100)
+	# Face Arrière (Z = -100)
+	p1 = Point(Vector3(0, 0, -100),   Vector3(0,0,0)) # A : Origine
+	p2 = Point(Vector3(600, 0, -100), Vector3(0,0,0)) # B : Axe X
+	p3 = Point(Vector3(600, 50, -100),Vector3(0,0,0)) # C
+	p4 = Point(Vector3(0, 50, -100),  Vector3(0,0,0)) # D : Axe Y
+	# Face Avant (Z = 100)
+	p5 = Point(Vector3(0, 0, 100),    Vector3(0,0,0)) # E : Axe Z
+	p6 = Point(Vector3(600, 0, 100),  Vector3(0,0,0))
+	p7 = Point(Vector3(600, 50, 100), Vector3(0,0,0))
+	p8 = Point(Vector3(0, 50, 100),   Vector3(0,0,0))
+
+	all_volume_points = [p1, p2, p3, p4, p5, p6, p7, p8]
+	# Wireframe=False pour que le World le considère comme un obstacle solide
+	def create_edge(pa, pb, stiffness=1.0):
+		dist = (pa.pos - pb.pos).length()
+		return Edge(pa, pb, dist, stiffness)
+
+	# --- ARÊTES DU VOLUME (12 segments) ---
+	volume_edges = [
+		# Face arrière (Z = -100) : Reliant p1, p2, p3, p4
+		create_edge(p1, p2), create_edge(p2, p3), 
+		create_edge(p3, p4), create_edge(p4, p1),
+
+		# Face avant (Z = 100) : Reliant p5, p6, p7, p8
+		create_edge(p5, p6), create_edge(p6, p7), 
+		create_edge(p7, p8), create_edge(p8, p5),
+
+		# Liaisons entre arrière et avant (Profondeur)
+		create_edge(p1, p5), # Bas-Gauche
+		create_edge(p2, p6), # Bas-Droite
+		create_edge(p3, p7), # Haut-Droite
+		create_edge(p4, p8)  # Haut-Gauche
+	]
+
+	# Mise à jour de l'objet volume
+	volume = Body(all_volume_points, volume_edges, [], wireframe=False, freeze=True)
+
+	world = World(forces=[gravity], bodies=[body, volume], T=0.0, h=0.016)
 
 	running = True
 	last_time = pygame.time.get_ticks() / 1000 # in seconds
@@ -448,12 +548,19 @@ if __name__ == "__main__":
 				
 				for p in all_points:
 					if (p.pos - mouse_v).length() < 15: # Rayon de 15 pixels
-						selected_point = p
-						is_dragging = True
-						# On mémorise si le point était fixe ou non pour le restaurer après
-						p.old_w = p.w 
-						p.w = 0.0 # On le rend "fixe" temporairement pour qu'il suive la souris parfaitement
-						break
+						if event.button == 3:
+							selected_point = p
+							is_dragging = True
+							# On mémorise si le point était fixe ou non pour le restaurer après
+							p.old_w = p.w 
+							p.w = 0.0 # On le rend "fixe" temporairement pour qu'il suive la souris parfaitement
+							break
+						elif event.button == 1:
+							# On envoie une impulsion vers le haut/droite par exemple
+							# Ou on peut calculer le vecteur (Point - Souris) pour "pousser" 
+							world.impulse(p, impulse)
+							break
+							
 			
 			if event.type == pygame.MOUSEBUTTONUP:
 				if is_dragging and selected_point:
@@ -465,7 +572,16 @@ if __name__ == "__main__":
 				if event.key == pygame.K_SPACE:
 					for body in world.bodies:
 						body.freeze = not(body.freeze)
+
+				if event.key == pygame.K_LEFT:
+					# Rotation vers la gauche (sens anti-horaire)
+					world.Rotate(world.bodies[1], Vector3(0, 0, math.radians(10)))
+
+				if event.key == pygame.K_RIGHT:
+					# Rotation vers la droite (sens horaire)
+					world.Rotate(world.bodies[1], Vector3(0, 0, -math.radians(10)))
 				
+
 		if is_dragging and selected_point:
 			mx, my = pygame.mouse.get_pos()
 			world_y = screen_height - my

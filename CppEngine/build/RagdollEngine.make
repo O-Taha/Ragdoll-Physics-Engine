@@ -47,16 +47,16 @@ ifeq ($(config),debug)
 TARGETDIR = ../bin/Debug
 TARGET = $(TARGETDIR)/RagdollEngine
 OBJDIR = ../bin-int/Debug
-ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -g
-ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -g -std=c++17
+ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -g -fdebug-prefix-map=/workspace=.
+ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -g -std=c++17 -fdebug-prefix-map=/workspace=.
 ALL_LDFLAGS += $(LDFLAGS) -L/usr/local/lib -L/usr/lib64 -m64
 
 else ifeq ($(config),release)
 TARGETDIR = ../bin/Release
 TARGET = $(TARGETDIR)/RagdollEngine
 OBJDIR = ../bin-int/Release
-ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -O2
-ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -O2 -std=c++17
+ALL_CFLAGS += $(CFLAGS) $(ALL_CPPFLAGS) -m64 -O2 -fdebug-prefix-map=/workspace=.
+ALL_CXXFLAGS += $(CXXFLAGS) $(ALL_CPPFLAGS) -m64 -O2 -std=c++17 -fdebug-prefix-map=/workspace=.
 ALL_LDFLAGS += $(LDFLAGS) -L/usr/local/lib -L/usr/lib64 -m64 -s
 
 endif
