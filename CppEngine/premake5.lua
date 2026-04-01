@@ -22,3 +22,8 @@ project "RagdollEngine"
 
     filter "configurations:Release"
         optimize "On"
+    
+    filter "system:linux"
+    buildoptions {
+        "-fdebug-prefix-map=" .. os.getcwd() .. "=."
+    }

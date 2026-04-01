@@ -27,7 +27,6 @@ enum SceneType {
 
 int currentScene = 0;
 World* world = nullptr;
-std::vector<Body*> bodies;
 
 Point* selectedPoint = nullptr;
 bool isDragging = false;
@@ -55,7 +54,7 @@ class Point {
         Body* owner;
 
     public:
-        Point(Vector3 pos, Vector3 vel, float w = 1.0): pos(pos), vel(vel), w(w){
+        Point(Vector3 pos, Vector3 vel, float w = 1.0): pos(pos), vel(vel), w(w), oldW(w){
             this->recordPos.push_back(pos);
         }
 
@@ -64,6 +63,7 @@ class Point {
         const Vector3& vel_() const     { return vel; }
         const Vector3& acc_() const     { return acc; }
         const float w_() const          { return w; }
+        const float oldW_() const          { return oldW; }
         const Body* owner_() const      { return owner; }
 
         void pos_(const Vector3& v)     { pos = v; }
@@ -100,6 +100,7 @@ class Body {
         std::vector<std::function<Vector3(World&, Body&, Point&)>> forces;
         bool wireframe;
         bool freeze;
+        static std::vector<Body*> bodies;
 
         Body( // Constructor
             std::vector<Point*> points,
@@ -108,6 +109,7 @@ class Body {
             bool wireframe,
             bool freeze
         ) : points(points), edges(edges), forces(forces), wireframe(wireframe), freeze(freeze) {
+            bodies.push_back(this);
             for (Point*& p : this->points) {
                 p->owner_(this);
             }
@@ -122,6 +124,7 @@ class Body {
             }
         }
 };
+std::vector<Body*> Body::bodies;
 
 class World {
     std::vector<Body*> bodies;
@@ -231,8 +234,8 @@ class World {
             float min_d = std::min(std::min(dist_left, dist_right),
                                 std::min(dist_bottom, dist_top));
 
-            Vector3 u_norm = Vector3Normalize(u);
-            Vector3 v_norm = Vector3Normalize(v);
+            Vector3 u_norm = (Vector3Length(u) < 1e-6f) ? Vector3{0,0,0} : Vector3Normalize(u);
+            Vector3 v_norm = (Vector3Length(v) < 1e-6f) ? Vector3{0,0,0} : Vector3Normalize(v);
 
             if (min_d == dist_left)
                 p.pos_(Vector3Subtract(p.pos_(), Vector3Scale(u_norm, dist_left)));
@@ -260,7 +263,7 @@ class World {
         void runStep(float dt = -1) {
             h = (dt <= 0)? h : dt; // if no time-step provided, default to class member h
             for (Body*& body : bodies) {
-                if (! body->wireframe) continue; // HACK: REFACTOR
+                if (! body->wireframe) continue; // HACK: REFACTOR (if body is volume, wall... don't apply verlet)
                 
                 if (! body->freeze) {
                     for (Point*& p : body->points) {
@@ -285,6 +288,9 @@ class World {
             }
             
             t += h;
+            if (recordTime.size() > 1000)
+                recordTime.erase(recordTime.begin());
+
             recordTime.push_back(t);
         }
 };
@@ -293,7 +299,7 @@ Point* getPointUnderCursor(Vector2 mouse)
 {
     Vector3 m = screenToWorld(mouse);
 
-    for (Body*& b : bodies)
+    for (Body*& b : Body::bodies)
     {
         for (Point*& p : b->points)
         {
@@ -314,12 +320,12 @@ auto gravity = [](World& world, Body& body, Point& point) -> Vector3
 
 void loadPendulum()
 {
-    for (auto b : bodies) {
+    for (auto b : Body::bodies) {
         for (auto p : b->points) delete p;
         for (auto e : b->edges) delete e;
         delete b;
     }
-    bodies.clear();
+    Body::bodies.clear();
 
     Point* p1 = new Point({400, 400, 0}, {0,0,0}, 0.0f); // fixed
     Point* p2 = new Point({350, 300, 0}, {0,0,0}, 1.0f);
@@ -329,19 +335,19 @@ void loadPendulum()
     Body* body = new Body({p1, p2}, {e1}, {}, true, false);
     body->forces.push_back(gravity);
 
-    bodies.push_back(body);
+    Body::bodies.push_back(body);
 
-    world = new World({gravity}, bodies, 0.0f, 0.016f);
+    world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
 }
 
 void loadRagdoll()
 {
-    for (auto b : bodies) {
+    for (auto b : Body::bodies) {
         for (auto p : b->points) delete p;
         for (auto e : b->edges) delete e;
         delete b;
     }
-    bodies.clear();
+    Body::bodies.clear();
 
     float x = 400, y = 350;
 
@@ -376,7 +382,7 @@ void loadRagdoll()
     Body* body = new Body(pts, edges, {}, true, false);
     body->forces.push_back(gravity);
 
-    bodies.push_back(body);
+    Body::bodies.push_back(body);
 
     // ----- SOL -----
     Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
@@ -397,25 +403,42 @@ void loadRagdoll()
         true    // freeze
     );
 
-    bodies.push_back(ground);
+    Body::bodies.push_back(ground);
 
-    world = new World({gravity}, bodies, 0.0f, 0.016f);
+    world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
 }
 
 // ----------------------
 // SCENE SWITCH
 // ----------------------
 
+void deleteAllBodies(){
+    for (auto b : Body::bodies) {
+        for (auto p : b->points) delete p;
+        for (auto e : b->edges) delete e;
+        delete b;
+    }
+    Body::bodies.clear();
+}
+
 void loadScene(int scene)
 {
-    if (world) delete world;
+    selectedPoint = nullptr;
+    isDragging = false;
+
+    deleteAllBodies();
+
+    if (world) {
+        delete world;
+        world = nullptr;
+    }
 
     switch(scene)
     {
         case PENDULUM: loadPendulum(); break;
         case RAGDOLL:  loadRagdoll();  break;
     }
-}   
+}
 
 int main()
 {
@@ -427,7 +450,7 @@ int main()
     while (!WindowShouldClose())
     {
         float dt = GetFrameTime();
-        if (dt > 0.05f) dt = 0.016f;
+        dt = fminf(dt, 0.016f);
 
         if (IsKeyPressed(KEY_SPACE)) {
             running = !running;
@@ -438,11 +461,15 @@ int main()
 
                 // -------- INPUT --------
             if (IsKeyPressed(KEY_RIGHT)) {
+                isDragging = false;
+                selectedPoint = nullptr;
                 currentScene = (currentScene + 1) % SCENE_COUNT;
                 loadScene(currentScene);
             }
 
             if (IsKeyPressed(KEY_LEFT)) {
+                isDragging = false;
+                selectedPoint = nullptr;
                 currentScene = (currentScene - 1 + SCENE_COUNT) % SCENE_COUNT;
                 loadScene(currentScene);
             }
@@ -464,9 +491,9 @@ int main()
             {
                 if (selectedPoint)
                 {
-                    selectedPoint->invW_(1.0f); // ⚠️ simplifié (tu peux stocker oldW si tu veux propre)
-                    selectedPoint = nullptr;
+                    selectedPoint->invW_(selectedPoint->oldW_());
                 }
+                selectedPoint = nullptr;
                 isDragging = false;
             }
 
@@ -477,17 +504,18 @@ int main()
 
                 selectedPoint->pos_(m);
                 selectedPoint->oldPos_(m); // CRUCIAL sinon explosion physique
+                selectedPoint->vel_({0,0,0});
             }
 
             // -------- UPDATE --------
-            world->runStep(dt);
+            if (world) world->runStep(dt);
 
         }
         // -------- DRAW --------
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-        for (auto b : bodies)
+        for (auto b : Body::bodies)
             b->Draw();
 
         DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
