@@ -320,13 +320,6 @@ auto gravity = [](World& world, Body& body, Point& point) -> Vector3
 
 void loadPendulum()
 {
-    for (auto b : Body::bodies) {
-        for (auto p : b->points) delete p;
-        for (auto e : b->edges) delete e;
-        delete b;
-    }
-    Body::bodies.clear();
-
     Point* p1 = new Point({400, 400, 0}, {0,0,0}, 0.0f); // fixed
     Point* p2 = new Point({350, 300, 0}, {0,0,0}, 1.0f);
 
@@ -335,20 +328,11 @@ void loadPendulum()
     Body* body = new Body({p1, p2}, {e1}, {}, true, false);
     body->forces.push_back(gravity);
 
-    Body::bodies.push_back(body);
-
     world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
 }
 
 void loadRagdoll()
 {
-    for (auto b : Body::bodies) {
-        for (auto p : b->points) delete p;
-        for (auto e : b->edges) delete e;
-        delete b;
-    }
-    Body::bodies.clear();
-
     float x = 400, y = 350;
 
     Point* head = new Point({x, y, 0}, {0,0,0}, 1.0f);
@@ -382,8 +366,6 @@ void loadRagdoll()
     Body* body = new Body(pts, edges, {}, true, false);
     body->forces.push_back(gravity);
 
-    Body::bodies.push_back(body);
-
     // ----- SOL -----
     Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
     Point* s2 = new Point({800, 0, 0}, {0,0,0}, 0.0f);
@@ -402,8 +384,6 @@ void loadRagdoll()
         false,  // ⚠️ IMPORTANT
         true    // freeze
     );
-
-    Body::bodies.push_back(ground);
 
     world = new World({gravity}, Body::bodies, 0.0f, 0.016f);
 }
@@ -426,12 +406,12 @@ void loadScene(int scene)
     selectedPoint = nullptr;
     isDragging = false;
 
-    deleteAllBodies();
-
-    if (world) {
+    
+    if (world != nullptr) {
         delete world;
         world = nullptr;
     }
+    deleteAllBodies();
 
     switch(scene)
     {
