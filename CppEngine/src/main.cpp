@@ -4,6 +4,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#define RAYGUI_IMPLEMENTATION
+#include "raygui.h"
+
 /*===========[ How to run ]===========
 cd CppEngine/              ;
 #[Wait for container to launch...]
@@ -42,7 +45,7 @@ Vector3 screenToWorld(Vector2 mouse)
         };
 }
 
-class Point {
+class Point {   
     private:
         Vector3 pos;
         Vector3 oldPos;
@@ -299,6 +302,7 @@ Point* getPointUnderCursor(Vector2 mouse)
 {
     Vector3 m = screenToWorld(mouse);
 
+
     for (Body*& b : Body::bodies)
     {
         for (Point*& p : b->points)
@@ -420,6 +424,44 @@ void loadScene(int scene)
     }
 }
 
+char textInput[96] = "test test test";
+bool textBoxEditMode = false;
+
+bool boxEnableGround = false;
+bool boxEnableGravity = false;
+bool boxEnableWind = false;
+bool boxEnableBullet = false;
+
+
+bool btnAddBodyPressed = false;
+bool btnDeleteBodyPressed = false;
+
+bool btnAddVolumePressed = false;
+bool btnDeleteVolumePressed = false;
+
+bool btnConfigGravityPressed = false;
+bool btnConfigWindPressed = false;
+bool btnConfigBulletPressed = false;
+
+bool btnConfigGravityWindow = false;
+bool btnConfigWindWindow = false;
+bool btnConfigBulletWindow = false;
+
+bool btnRunPressed = false;
+
+
+void run(){}
+void addBody(){}
+void deleteBody(){}
+void addVolume(){}
+void deleteVolume(){}
+
+void enableGround(){}
+void enableGravity(){}
+void enableWind(){}
+void enableBullet(){}
+
+
 int main()
 {
     InitWindow(800, 450, "Physics Engine");
@@ -491,17 +533,87 @@ int main()
             if (world) world->runStep(dt);
 
         }
+        // -----
+      
+        if(boxEnableGround) enableGround();
+        if(boxEnableGravity) enableGravity();
+        if(boxEnableWind) enableWind();
+        if(boxEnableBullet) enableBullet();
+      
         // -------- DRAW --------
+        
+        
+      
         BeginDrawing();
         ClearBackground(RAYWHITE);
+      
+            DrawLine(500, 0, 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.6f));
+            DrawRectangle(500, 0, GetScreenWidth() - 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.3f));
 
-        for (auto b : Body::bodies)
-            b->Draw();
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 24);
+            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
+            GuiSetStyle(LABEL, TEXT_PADDING, 5);
+            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
+            GuiLabel((Rectangle){500, 10, GetScreenWidth() - 500, 32}, "Settings");
+            
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 16);
+            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
+            GuiSetStyle(LABEL, TEXT_PADDING, 5);
+            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
 
-        DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
+            GuiLabel((Rectangle){500, 30, GetScreenWidth() - 500, 32}, "Bodies & shapes");
+
+            GuiLabel((Rectangle){500, 170, GetScreenWidth() - 500, 32}, "World Environment");
+
+            GuiLabel((Rectangle){500, 310, GetScreenWidth() - 500, 32}, "Bullet");
+
+            GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround);
+            GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
+            GuiCheckBox((Rectangle){640, 240, 20, 20}, "Enable Wind", &boxEnableWind);
+            GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
+
+            GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
+
+            if(GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body")) addBody();
+            if(GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body")) deleteBody();
+
+            if(GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume")) addVolume();
+            if(GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body")) deleteVolume();
+            
+            if(GuiButton((Rectangle){505, 200, 120, 30}, "#142#Config Gravity")) btnConfigGravityWindow = !btnConfigGravityWindow;
+
+            if(btnConfigGravityWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
+
+            if(GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind")) btnConfigWindWindow = !btnConfigWindWindow;
+
+            if(btnConfigWindWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
+
+            if(GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet")) btnConfigBulletWindow = !btnConfigBulletWindow;
+
+            if(btnConfigBulletWindow)
+            {
+                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+            }
+            
+            if(GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run")) run();
+      
+        // -------
+
+             for (auto b : Body::bodies)
+                b->Draw();
+
+              DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
 
         EndDrawing();
     }
 
     CloseWindow();
+    
+    return 0;
 }
