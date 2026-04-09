@@ -348,19 +348,19 @@ class World {
 
         World(std::vector<std::function<Vector3(World&, Body&, Point&)>> forces, std::vector<Body*> bodies, float T = 0, float h = 1.0, float gravity = -9.81, Vector3 wind = Vector3{0.0f, 0.0f, 0.0f}): globalForces(forces), bodies(bodies), t(0), T(T), h(h), gravity(gravity), wind(wind){}
         
-        const float& gravity_() const     { return gravity; }
+        float& gravity_()   { return gravity; }
         void gravity_(const float& g)     { gravity = g; }
 
         const Vector3& wind_() const     { return wind; }
         void wind_(const Vector3& w)     { wind = w; }
 
-        const float& windX_() const     { return wind.x; }
+        float& windX_()     { return wind.x; }
         void windX_(const float& wx)     { wind.x = wx; }
 
-        const float& windY_() const     { return wind.y; }
+        float& windY_()     { return wind.y; }
         void windY_(const float& wy)     { wind.y = wy; }
 
-        const float& windZ_() const     { return wind.z; }
+        float& windZ_()     { return wind.z; }
         void windZ_(const float& wz)     { wind.z = wz; }
 
         void runStep(float dt = -1) {
@@ -526,6 +526,7 @@ void loadScene(int scene)
     selectedPoint = nullptr;
     //isDragging = false;
     mouseState = IDLE;
+    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     
     if (world != nullptr) {
         delete world;
@@ -560,6 +561,7 @@ int main()
             if (IsKeyPressed(KEY_RIGHT)) {
                 //isDragging = false;
                 mouseState = IDLE;
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
                 selectedPoint = nullptr;
                 currentScene = (currentScene + 1) % SCENE_COUNT;
                 loadScene(currentScene);
@@ -568,6 +570,7 @@ int main()
             if (IsKeyPressed(KEY_LEFT)) {
                 //isDragging = false;
                 mouseState = IDLE;
+                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
                 selectedPoint = nullptr;
                 currentScene = (currentScene - 1 + SCENE_COUNT) % SCENE_COUNT;
                 loadScene(currentScene);
@@ -587,6 +590,9 @@ int main()
                         loadBody(screenToWorld(mouse));
                         std::cout << "Placing body" << std::endl;
                         mouseState = IDLE;
+                        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+                        btnAddBodyPressed = false;
+
                 }
                 else if (selectedPoint)
                 {
@@ -600,6 +606,7 @@ int main()
                         selectedTarget = selectedPoint;
                         std::cout << selectedPoint->pos_().x << selectedPoint->pos_().y << std::endl;
                         mouseState = IDLE;
+                        SetMouseCursor(MOUSE_CURSOR_DEFAULT);
                         std::cout << "Targetting point" << std::endl;
                     }
                 }
@@ -614,7 +621,10 @@ int main()
                 }
                 selectedPoint = nullptr;
                 //isDragging = false;
-                if(mouseState != TARGETING && mouseState != PLACING) mouseState = IDLE;
+                if(mouseState != TARGETING && mouseState != PLACING) {
+                    mouseState = IDLE;
+                    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+                }
             }
 
             // DRAG
@@ -629,20 +639,19 @@ int main()
 
             // -------- UPDATE --------
             if (world) world->runStep(dt);
-
         }
         // -----
-      
+
         if(boxEnableGround) enableGround();
         if(boxEnableGravity) enableGravity();
         if(boxEnableWind) enableWind();
         if(boxEnableBullet) enableBullet();
-      
+
         // -------- DRAW --------
     
         BeginDrawing();
         ClearBackground(RAYWHITE);
-      
+
             DrawLine(500, 0, 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.6f));
             DrawRectangle(500, 0, GetScreenWidth() - 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.3f));
 
@@ -650,18 +659,18 @@ int main()
             GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
             GuiSetStyle(LABEL, TEXT_PADDING, 5);
             GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
-            GuiLabel((Rectangle){500, 10, GetScreenWidth() - 500, 32}, "Settings");
+            GuiLabel((Rectangle){500, 10, static_cast<float>(GetScreenWidth() - 500), 32}, "Settings");
             
             GuiSetStyle(DEFAULT, TEXT_SIZE, 16);
             GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
             GuiSetStyle(LABEL, TEXT_PADDING, 5);
             GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
 
-            GuiLabel((Rectangle){500, 30, GetScreenWidth() - 500, 32}, "Bodies & shapes");
+            GuiLabel((Rectangle){500, 30, static_cast<float>(GetScreenWidth() - 500), 32}, "Bodies & shapes");
 
-            GuiLabel((Rectangle){500, 170, GetScreenWidth() - 500, 32}, "World Environment");
+            GuiLabel((Rectangle){500, 170, static_cast<float>(GetScreenWidth() - 500), 32}, "World Environment");
 
-            GuiLabel((Rectangle){500, 310, GetScreenWidth() - 500, 32}, "Bullet");
+            GuiLabel((Rectangle){500, 310, static_cast<float>(GetScreenWidth() - 500), 32}, "Bullet");
 
             GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround);
             GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
@@ -670,12 +679,12 @@ int main()
 
             GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
 
-            if(GuiButton((Rectangle){505, 60, 120, 30}, "#149#Add Body")) btnAddBodyPressed = !btnAddBodyPressed;
+            GuiToggle((Rectangle){505, 60, 120, 30}, "#149#Add Bo dy", &btnAddBodyPressed);
 
             if(btnAddBodyPressed)
             {
                 mouseState = PLACING;
-                btnAddBodyPressed = false;
+                SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
                 std::cout << "MODE PLACING" << std::endl;
             }
 
@@ -684,50 +693,41 @@ int main()
             if(GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume")) addVolume();
             if(GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body")) deleteVolume();
             
-            if(GuiButton((Rectangle){505, 200, 120, 30}, "#142#Config Gravity")) btnConfigGravityWindow = !btnConfigGravityWindow;
-
+            GuiToggle((Rectangle){505, 200, 120, 30}, "#142#Config Gravity", &btnConfigGravityWindow);
             if(btnConfigGravityWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
-                if (GuiTextBox((Rectangle){ 40, 64, 720, 32 }, textGravityInput, 95, textBoxGravityEditMode))
+                if (GuiValueBoxFloat((Rectangle){ 40, 64, 720, 32 }, "Gravity", textGravityInput, &world->gravity_(), textBoxGravityEditMode))
                 {
                     textBoxGravityEditMode = !textBoxGravityEditMode;
-                    
-                    world->gravity_(std::stof(textGravityInput));
                     std::cout << world->gravity_() << std::endl;
                 }
             }
 
-            if(GuiButton((Rectangle){505, 240, 120, 30}, "#142#Config Wind")) btnConfigWindWindow = !btnConfigWindWindow;
-
+            GuiToggle((Rectangle){505, 240, 120, 30}, "#142#Config Wind", &btnConfigWindWindow);
             if(btnConfigWindWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
-                if (GuiTextBox((Rectangle){ 40, 64, 720, 32 }, textWindXInput, 95, textBoxWindXEditMode))
+                if (GuiValueBoxFloat((Rectangle){ 40, 64, 720, 32 }, "Wind X", textWindXInput, &world->windX_(), textBoxWindXEditMode))
                 {
                     textBoxWindXEditMode = !textBoxWindXEditMode;
-                    
-                    world->windX_(std::stof(textWindXInput));
                     std::cout << world->windX_() << std::endl;
                 }
-                if (GuiTextBox((Rectangle){ 40, 100, 720, 32 }, textWindYInput, 95, textBoxWindYEditMode))
+
+                if (GuiValueBoxFloat((Rectangle){ 40, 100, 720, 32 }, "Wind Y", textWindYInput, &world->windY_(), textBoxWindYEditMode))
                 {
                     textBoxWindYEditMode = !textBoxWindYEditMode;
-                    
-                    world->windY_(std::stof(textWindYInput));
                     std::cout << world->windY_() << std::endl;
                 }
-                if (GuiTextBox((Rectangle){ 40, 160, 720, 32 }, textWindZInput, 95, textBoxWindZEditMode))
+
+                if (GuiValueBoxFloat((Rectangle){ 40, 160, 720, 32 }, "Wind Z", textWindZInput, &world->windZ_(), textBoxWindZEditMode))
                 {
                     textBoxWindZEditMode = !textBoxWindZEditMode;
-                    
-                    world->windZ_(std::stof(textWindZInput));
                     std::cout << world->windZ_() << std::endl;
                 }
             }
 
-            if(GuiButton((Rectangle){505, 340, 120, 30}, "#142#Config Bullet")) btnConfigBulletWindow = !btnConfigBulletWindow;
-
+            GuiToggle((Rectangle){505, 340, 120, 30}, "#142#Config Bullet", &btnConfigBulletWindow);
             if(btnConfigBulletWindow)
             {
                 DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
@@ -747,19 +747,18 @@ int main()
                 if(GuiValueBoxFloat((Rectangle){150, 250, 100, 20}, "y", textBulletYInput, &impulseBuf.y, textBoxBulletYEditMode)) textBoxBulletYEditMode = !textBoxBulletYEditMode;
                 if(GuiValueBoxFloat((Rectangle){150, 300, 100, 20}, "z", textBulletZInput, &impulseBuf.z, textBoxBulletZEditMode)) textBoxBulletZEditMode = !textBoxBulletZEditMode;
                 
-                if(GuiButton((Rectangle){150, 150, 120, 30}, "#142#Shoot Target")) btnShootTarget = !btnShootTarget;
+                GuiToggle((Rectangle){150, 150, 120, 30}, "#142#Shoot Target", &btnShootTarget);
+                if(btnShootTarget)
+                {
+                    if(selectedTarget) selectedTarget->impulse(impulseBuf);
 
-                    if(btnShootTarget)
-                    {
-                        if(selectedTarget) selectedTarget->impulse(impulseBuf);
-
-                        btnShootTarget = false;
-                    }
+                    btnShootTarget = false;
+                }
                 
             }
             
-            if(GuiButton((Rectangle){505, 400, 120, 30}, "#134#Run")) running = !running;
-      
+            GuiToggle((Rectangle){505, 400, 120, 30}, "#134#Run", &running);
+
         // -------
 
             for (auto b : Body::bodies) b->Draw();
@@ -781,8 +780,6 @@ int main()
 /*
 TO DO
 
-Convertir les boutons qu'il faut en bouton toggle
-Text box en value box
 Tester les limites du bouton run 
 Mettre en forme
 Delete Body
