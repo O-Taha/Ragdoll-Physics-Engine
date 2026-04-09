@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ostream>
 #include <string>
 #include <functional>
 #include <vector>
@@ -15,6 +16,8 @@ make docker-run
 /====================================*/
 
 #define CORRECTION_PASS 10 // Number of iterations for collision detection
+#define WINDOW_HEIGHT 450
+#define WINDOW_WIDTH 800
 
 bool running = false;
 
@@ -31,6 +34,7 @@ enum SceneType {
 
 int currentScene = 0;
 World* world = nullptr;
+Body* groundBody = nullptr;
 
 Point* selectedPoint = nullptr;
 Point* selectedTarget = nullptr;
@@ -101,13 +105,20 @@ void deleteBody(){}
 void addVolume(){}
 void deleteVolume(){}
 
-void enableGround(){}
 void enableGravity(){}
 void enableWind(){}
 void enableBullet(){}
 
-//
+static void removeFromVector(std::vector<Body*>& vec, Body* b)
+{
+    vec.erase(std::remove(vec.begin(), vec.end(), b), vec.end());
+}
 
+static void addToVector(std::vector<Body*>& vec, Body* b)
+{
+    if (std::find(vec.begin(), vec.end(), b) == vec.end())
+        vec.push_back(b);
+}
 
 inline Vector2 toVector2(const Vector3& v) {return {v.x, v.y};}
 inline Vector2 worldToScreen(const Vector3& v) {return {v.x, (float)GetScreenHeight() - v.y};}
@@ -143,7 +154,10 @@ class Point {
         const float oldW_() const          { return oldW; }
         const Body* owner_() const      { return owner; }
 
-        void pos_(const Vector3& v)     { pos = v; }
+        void pos_(const Vector3& v){
+            pos = v;
+            // if (Vector2Length(toVector2(pos)) > WINDOW_HEIGHT * 2) delete owner; //HACK : FIX OOB Deletion
+        }
         void oldPos_(const Vector3& v)  { oldPos = v; }
         void incrementPos(float dx, float dy = 0) { 
             pos.x += dx; pos.y += dy;
@@ -184,6 +198,7 @@ class Body {
         std::vector<std::function<Vector3(World&, Body&, Point&)>> forces;
         bool wireframe;
         bool freeze;
+        bool enabled;
         static std::vector<Body*> bodies;
 
         Body( // Constructor
@@ -192,11 +207,42 @@ class Body {
             std::vector<std::function<Vector3(World&, Body&, Point&)>> forces,      
             bool wireframe,
             bool freeze
-        ) : points(points), edges(edges), forces(forces), wireframe(wireframe), freeze(freeze) {
+        ) : points(points), edges(edges), forces(forces), wireframe(wireframe), freeze(freeze), enabled(true) {
             bodies.push_back(this);
             for (Point*& p : this->points) {
                 p->owner_(this);
             }
+        }
+
+        ~Body(){
+            for (Point* p : points) delete p;
+            for (Edge* e : edges) delete e;
+        }
+
+        void disable(std::vector<Body*>& body_vec)
+        {
+            if (!enabled) return;
+
+            enabled = false;
+
+            // Retirer des collisions (World)
+            removeFromVector(body_vec, this);
+
+            // Optionnel : retirer aussi du global
+            removeFromVector(Body::bodies, this);
+        }
+
+        void enable(std::vector<Body*>& body_vec)
+        {
+            if (enabled) return;
+
+            enabled = true;
+
+            // Réintégrer dans les collisions
+            addToVector(body_vec, this);
+
+            // Réintégrer dans le global
+            addToVector(Body::bodies, this);
         }
 
         void Draw() {
@@ -504,7 +550,7 @@ void loadGround()
         false,  // ⚠️ IMPORTANT
         true    // freeze
     );
-
+    groundBody = ground;
     world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
 }
 
@@ -513,41 +559,40 @@ void loadGround()
 // ----------------------
 
 void deleteAllBodies(){
-    for (auto b : Body::bodies) {
-        for (auto p : b->points) delete p;
-        for (auto e : b->edges) delete e;
+    for (Body* b : Body::bodies) {
         delete b;
     }
     Body::bodies.clear();
 }
 
-void loadScene(int scene)
-{
-    selectedPoint = nullptr;
-    //isDragging = false;
-    mouseState = IDLE;
-    SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+// void loadScene(int scene)
+// {
+//     selectedPoint = nullptr;
+//     //isDragging = false;
+//     mouseState = IDLE;
+//     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
     
-    if (world != nullptr) {
-        delete world;
-        world = nullptr;
-    }
-    deleteAllBodies();
+//     if (world != nullptr) {
+//         delete world;
+//         world = nullptr;
+//     }
+//     deleteAllBodies();
 
-    switch(scene)
-    {
-        case PENDULUM: loadPendulum(); break;
-        case RAGDOLL:  loadGround();  break;
-    }
-}
+//     switch(scene)
+//     {
+//         case PENDULUM: loadPendulum(); break;
+//         case RAGDOLL:  loadGround();  break;
+//     }
+// }
 
 
 int main()
 {
-    InitWindow(800, 450, "Physics Engine");
+    InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Physics Engine");
     SetTargetFPS(60);
 
-    loadScene(currentScene);
+    loadGround();
+    boxEnableGround = true;
     running = true;
     while (!WindowShouldClose())
     {
@@ -558,23 +603,23 @@ int main()
             Vector2 mouse = GetMousePosition();
 
                 // -------- INPUT --------
-            if (IsKeyPressed(KEY_RIGHT)) {
-                //isDragging = false;
-                mouseState = IDLE;
-                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-                selectedPoint = nullptr;
-                currentScene = (currentScene + 1) % SCENE_COUNT;
-                loadScene(currentScene);
-            }
+            // if (IsKeyPressed(KEY_RIGHT)) {
+            //     //isDragging = false;
+            //     mouseState = IDLE;
+            //     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            //     selectedPoint = nullptr;
+            //     currentScene = (currentScene + 1) % SCENE_COUNT;
+            //     loadScene(currentScene);
+            // }
 
-            if (IsKeyPressed(KEY_LEFT)) {
-                //isDragging = false;
-                mouseState = IDLE;
-                SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-                selectedPoint = nullptr;
-                currentScene = (currentScene - 1 + SCENE_COUNT) % SCENE_COUNT;
-                loadScene(currentScene);
-            }
+            // if (IsKeyPressed(KEY_LEFT)) {
+            //     //isDragging = false;
+            //     mouseState = IDLE;
+            //     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+            //     selectedPoint = nullptr;
+            //     currentScene = (currentScene - 1 + SCENE_COUNT) % SCENE_COUNT;
+            //     loadScene(currentScene);
+            // }
 
             //if (IsKeyPressed(KEY_K)) {
             //    std::cout << "impulse" << std::endl;
@@ -642,7 +687,6 @@ int main()
         }
         // -----
 
-        if(boxEnableGround) enableGround();
         if(boxEnableGravity) enableGravity();
         if(boxEnableWind) enableWind();
         if(boxEnableBullet) enableBullet();
@@ -672,14 +716,17 @@ int main()
 
             GuiLabel((Rectangle){500, 310, static_cast<float>(GetScreenWidth() - 500), 32}, "Bullet");
 
-            GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround);
+            if(GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround)) {
+                if (boxEnableGround) groundBody->enable(world->bodies);
+                else groundBody->disable(world->bodies);      
+            }
             GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
             GuiCheckBox((Rectangle){640, 240, 20, 20}, "Enable Wind", &boxEnableWind);
             GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
 
             GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
 
-            GuiToggle((Rectangle){505, 60, 120, 30}, "#149#Add Bo dy", &btnAddBodyPressed);
+            GuiToggle((Rectangle){505, 60, 120, 30}, "#149#Add Body", &btnAddBodyPressed);
 
             if(btnAddBodyPressed)
             {
@@ -761,7 +808,7 @@ int main()
 
         // -------
 
-            for (auto b : Body::bodies) b->Draw();
+            for (Body* b : Body::bodies) b->Draw();
             
             if(selectedTarget) selectedTarget->Draw(GREEN);
 
@@ -788,5 +835,5 @@ Add volume
 
 Delete Volume
 
-
+supprimer les bodies Out of bounds
 */
