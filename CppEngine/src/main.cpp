@@ -722,7 +722,7 @@ int main()
             }
             GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
             GuiCheckBox((Rectangle){640, 240, 20, 20}, "Enable Wind", &boxEnableWind);
-            GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
+            //GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
 
             GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
 
@@ -743,8 +743,9 @@ int main()
             GuiToggle((Rectangle){505, 200, 120, 30}, "#142#Config Gravity", &btnConfigGravityWindow);
             if(btnConfigGravityWindow)
             {
-                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
-                if (GuiValueBoxFloat((Rectangle){ 40, 64, 720, 32 }, "Gravity", textGravityInput, &world->gravity_(), textBoxGravityEditMode))
+                DrawRectangle(30, 70, 150, 70, Fade(LIGHTGRAY, 0.3f));
+                GuiLabel((Rectangle){30, 70, 150, 32}, "Config Gravity");
+                if (GuiValueBoxFloat((Rectangle){80, 100, 80, 30}, "Gravity", textGravityInput, &world->gravity_(), textBoxGravityEditMode))
                 {
                     textBoxGravityEditMode = !textBoxGravityEditMode;
                     std::cout << world->gravity_() << std::endl;
@@ -754,20 +755,21 @@ int main()
             GuiToggle((Rectangle){505, 240, 120, 30}, "#142#Config Wind", &btnConfigWindWindow);
             if(btnConfigWindWindow)
             {
-                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
-                if (GuiValueBoxFloat((Rectangle){ 40, 64, 720, 32 }, "Wind X", textWindXInput, &world->windX_(), textBoxWindXEditMode))
+                DrawRectangle(30, 150, 150, 140, Fade(LIGHTGRAY, 0.3f));
+                GuiLabel((Rectangle){30, 150, 150, 32}, "Config Wind");
+                if (GuiValueBoxFloat((Rectangle){ 50, 180, 100, 32 }, "x", textWindXInput, &world->windX_(), textBoxWindXEditMode))
                 {
                     textBoxWindXEditMode = !textBoxWindXEditMode;
                     std::cout << world->windX_() << std::endl;
                 }
 
-                if (GuiValueBoxFloat((Rectangle){ 40, 100, 720, 32 }, "Wind Y", textWindYInput, &world->windY_(), textBoxWindYEditMode))
+                if (GuiValueBoxFloat((Rectangle){ 50, 215, 100, 32 }, "y", textWindYInput, &world->windY_(), textBoxWindYEditMode))
                 {
                     textBoxWindYEditMode = !textBoxWindYEditMode;
                     std::cout << world->windY_() << std::endl;
                 }
 
-                if (GuiValueBoxFloat((Rectangle){ 40, 160, 720, 32 }, "Wind Z", textWindZInput, &world->windZ_(), textBoxWindZEditMode))
+                if (GuiValueBoxFloat((Rectangle){ 50, 250, 100, 32 }, "z", textWindZInput, &world->windZ_(), textBoxWindZEditMode))
                 {
                     textBoxWindZEditMode = !textBoxWindZEditMode;
                     std::cout << world->windZ_() << std::endl;
@@ -777,9 +779,10 @@ int main()
             GuiToggle((Rectangle){505, 340, 120, 30}, "#142#Config Bullet", &btnConfigBulletWindow);
             if(btnConfigBulletWindow)
             {
-                DrawRectangle(150, 100, 200, 110, Fade(LIGHTGRAY, 0.3f));
+                DrawRectangle(190, 70, 150, 150, Fade(LIGHTGRAY, 0.3f));
+                GuiLabel((Rectangle){190, 70, 150, 32}, "Config Bullet");
                 // Selection du point
-                if(GuiButton((Rectangle){150, 100, 120, 30}, "#142#Select Target")) btnSelectTarget = !btnSelectTarget;
+                if(GuiButton((Rectangle){200, 100, 120, 30}, "#142#Select Target")) btnSelectTarget = !btnSelectTarget;
 
                     if(btnSelectTarget)
                     {
@@ -790,18 +793,17 @@ int main()
 
                     }
 
-                if(GuiValueBoxFloat((Rectangle){150, 200, 100, 20}, "x", textBulletXInput, &impulseBuf.x, textBoxBulletXEditMode)) textBoxBulletXEditMode = !textBoxBulletXEditMode;
-                if(GuiValueBoxFloat((Rectangle){150, 250, 100, 20}, "y", textBulletYInput, &impulseBuf.y, textBoxBulletYEditMode)) textBoxBulletYEditMode = !textBoxBulletYEditMode;
-                if(GuiValueBoxFloat((Rectangle){150, 300, 100, 20}, "z", textBulletZInput, &impulseBuf.z, textBoxBulletZEditMode)) textBoxBulletZEditMode = !textBoxBulletZEditMode;
-                
-                GuiToggle((Rectangle){150, 150, 120, 30}, "#142#Shoot Target", &btnShootTarget);
-                if(btnShootTarget)
-                {
-                    if(selectedTarget) selectedTarget->impulse(impulseBuf);
+                if(GuiValueBoxFloat((Rectangle){210, 140, 100, 20}, "x", textBulletXInput, &impulseBuf.x, textBoxBulletXEditMode)) textBoxBulletXEditMode = !textBoxBulletXEditMode;
+                if(GuiValueBoxFloat((Rectangle){210, 165, 100, 20}, "y", textBulletYInput, &impulseBuf.y, textBoxBulletYEditMode)) textBoxBulletYEditMode = !textBoxBulletYEditMode;
+                if(GuiValueBoxFloat((Rectangle){210, 190, 100, 20}, "z", textBulletZInput, &impulseBuf.z, textBoxBulletZEditMode)) textBoxBulletZEditMode = !textBoxBulletZEditMode;            
+            }
 
-                    btnShootTarget = false;
-                }
-                
+            GuiToggle((Rectangle){640, 340, 120, 30}, "#142#Shoot Target", &btnShootTarget);
+            if(btnShootTarget)
+            {
+                if(selectedTarget) selectedTarget->impulse(impulseBuf);
+
+                btnShootTarget = false;
             }
             
             GuiToggle((Rectangle){505, 400, 120, 30}, "#134#Run", &running);
