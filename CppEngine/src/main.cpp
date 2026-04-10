@@ -16,8 +16,10 @@ make docker-run
 /====================================*/
 
 #define CORRECTION_PASS 10 // Number of iterations for collision detection
-#define WINDOW_HEIGHT 450
-#define WINDOW_WIDTH 800
+#define WINDOW_HEIGHT 720
+#define WINDOW_WIDTH 1920
+
+#define NB_DIAPO 29
 
 bool running = false;
 
@@ -51,6 +53,20 @@ enum mouseMode {
 mouseMode mouseState = IDLE; 
 
 // Globale pour GUI
+
+bool pendulumLoaded = false;
+Body* pendulumPointer = nullptr; // Pour pouvoir le supprimer précisément
+
+bool springLoaded = false;
+Body* springPointer = nullptr; // Pour pouvoir le supprimer précisément
+
+bool ballAndWallLoaded = false;
+Body* cube1Pointer = nullptr;
+Body* cube2Pointer = nullptr;
+Body* ballPointer = nullptr;
+
+Body* diapoHanger = nullptr;
+
 
 bool boxEnableGround = false;
 bool boxEnableGravity = true;
@@ -482,16 +498,132 @@ auto wind = [](World& world, Body& body, Point& point) -> Vector3
 
 void loadPendulum()
 {
-    Point* p1 = new Point({400, 400, 0}, {0,0,0}, 0.0f); // fixed
-    Point* p2 = new Point({350, 300, 0}, {0,0,0}, 1.0f);
+    Point* p1 = new Point({GetScreenWidth()/2, 400, 0}, {0,0,0}, 0.0f); // fixed
+    Point* p2 = new Point({GetScreenWidth()/2, 300, 0}, {0,0,0}, 1.0f);
+    Point* p3 = new Point({GetScreenWidth()/2, 200, 0}, {200,0,0}, 1.0f);
 
     Edge* e1 = new Edge(*p1, *p2, 100.0f, 1.0f);
+    Edge* e2 = new Edge(*p2, *p3, 100.0f, 1.0f);
 
-    Body* body = new Body({p1, p2}, {e1}, {}, true, false);
+    pendulumPointer = new Body({p1, p2, p3}, {e1, e2}, {}, true, false);
 
-    world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
+    world->bodies.push_back(pendulumPointer);
+    //world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
 
 }
+
+void loadSpring()
+{
+    Point* p1 = new Point({GetScreenWidth()/2, 400, 0}, {0,0,0}, 0.0f); // fixed
+    Point* p2 = new Point({GetScreenWidth()/2, 300, 0}, {0,0,0}, 1.0f);
+
+    Edge* e1 = new Edge(*p1, *p2, 100.0f, 0.01f);
+
+    springPointer = new Body({p1, p2}, {e1}, {}, true, false);
+
+    world->bodies.push_back(springPointer);
+    //world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
+
+}
+
+
+void loadClothesline() {
+    Point* p1 = new Point({GetScreenWidth()/2, 0, 0}, {0,0,0}, 0.0f); // fixed
+    Point* p2 = new Point({GetScreenWidth()/2, -50, 0}, {0,0,0}, 1.0f);
+
+    Edge* e1 = new Edge(*p1, *p2, 50, 1.0f);
+
+    // On crée un seul Body qui contient toute cette structure
+    diapoHanger = new Body({p1, p2}, {e1}, {}, true, false);
+    world->bodies.push_back(diapoHanger);
+    // Initialisation du monde si nécessaire
+    //if (world == nullptr) {
+    //    world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
+    //}
+}
+
+void loadBallAndWall()
+{
+    // --- CUBE 1 INCLINÉ (Le toboggan) ---
+    // Position du centre du cube et sa taille
+    Vector3 center1 = {GetScreenWidth()/2 + 200, 350, 0 };
+    float size1 = 150.0f;
+    float halfSize1 = size1 / 2.0f;
+
+    // Angle de rotation (en radians). Ex: -30 degrés pour pencher vers la droite
+    float angle1 = -30.0f * DEG2RAD; 
+    float cosA = cosf(angle1);
+    float sinA = sinf(angle1);
+
+    // Fonction locale pour calculer la position d'un coin après rotation
+    auto calcRotatedPoint = [&](float localX, float localY) -> Vector3 {
+        return {
+            center1.x + (localX * cosA - localY * sinA),
+            center1.y + (localX * sinA + localY * cosA),
+            0
+        };
+    };
+
+    // Calcul des 4 coins (toujours dans l'ordre BG, BD, HD, HG pour checkCollisionBetween)
+    Point* c1_1 = new Point(calcRotatedPoint(-halfSize1, -halfSize1), {0,0,0}, 0.0f); // Bas Gauche
+    Point* c1_2 = new Point(calcRotatedPoint( halfSize1, -halfSize1), {0,0,0}, 0.0f); // Bas Droite
+    Point* c1_3 = new Point(calcRotatedPoint( halfSize1,  halfSize1), {0,0,0}, 0.0f); // Haut Droite
+    Point* c1_4 = new Point(calcRotatedPoint(-halfSize1,  halfSize1), {0,0,0}, 0.0f); // Haut Gauche
+
+    Edge* ec1_1 = new Edge(*c1_1, *c1_2);
+    Edge* ec1_2 = new Edge(*c1_2, *c1_3);
+    Edge* ec1_3 = new Edge(*c1_3, *c1_4);
+    Edge* ec1_4 = new Edge(*c1_4, *c1_1);
+    // Diagonale pour la rigidité structurelle (sinon le cube s'écrase)
+    //Edge* ec1_d = new Edge(*c1_1, *c1_3); 
+
+    cube1Pointer = new Body({c1_1, c1_2, c1_3, c1_4}, {ec1_1, ec1_2, ec1_3, ec1_4}, {}, false, true);
+
+    // --- CUBE 2 BAS ET LARGE (La réception) ---
+    // On le place plus bas et on le fait plus large pour bien réceptionner la balle
+    float groundY = 100.0f; // Juste au dessus du sol
+    float recWidth = 550.0f;
+    float recHeight = 100.0f;
+    float recStartX = 250.0f; // Positionné pour intercepter la trajectoire après le toboggan
+
+    Point* c2_1 = new Point({recStartX,            groundY,             0}, {0,0,0}, 0.0f); // BG
+    Point* c2_2 = new Point({recStartX + recWidth, groundY,             0}, {0,0,0}, 0.0f); // BD
+    Point* c2_3 = new Point({recStartX + recWidth, groundY + recHeight, 0}, {0,0,0}, 0.0f); // HD
+    Point* c2_4 = new Point({recStartX,            groundY + recHeight, 0}, {0,0,0}, 0.0f); // HG
+
+    Edge* ec2_1 = new Edge(*c2_1, *c2_2);
+    Edge* ec2_2 = new Edge(*c2_2, *c2_3);
+    Edge* ec2_3 = new Edge(*c2_3, *c2_4);
+    Edge* ec2_4 = new Edge(*c2_4, *c2_1);
+    //Edge* ec2_d = new Edge(*c2_1, *c2_3); // Diagonale de rigidité
+
+    cube2Pointer = new Body({c2_1, c2_2, c2_3, c2_4}, {ec2_1, ec2_2, ec2_3, ec2_4}, {}, false, true);
+
+    // --- LA BALLE (Point dynamique) ---
+    // On la place au dessus du premier cube penché pour qu'elle roule dessus
+    Point* ballPoint = new Point({center1.x - 50, center1.y + size1 + 50, 0}, {0, 0, 0}, 1.0f);
+    
+    Point* c3_1 = new Point({GetScreenWidth()/2 - 50, 500, 0}, {0,0,0}, 1.0f); // Bas Gauche
+    Point* c3_2 = new Point({GetScreenWidth()/2 + 50, 500, 0}, {0,0,0}, 1.0f); // Bas Droite
+    Point* c3_3 = new Point({GetScreenWidth()/2 + 50, 550, 0}, {0,0,0}, 1.0f); // Haut Droite
+    Point* c3_4 = new Point({GetScreenWidth()/2 - 50, 550, 0}, {0,0,0}, 1.0f); // Haut Gauche
+
+    Edge* ec3_1 = new Edge(*c3_1, *c3_2);
+    Edge* ec3_2 = new Edge(*c3_2, *c3_3);
+    Edge* ec3_3 = new Edge(*c3_3, *c3_4);
+    Edge* ec3_4 = new Edge(*c3_4, *c3_1);
+    // Diagonale pour la rigidité structurelle (sinon le cube s'écrase)
+    Edge* ec3_d = new Edge(*c3_1, *c3_3);
+
+    // Wireframe = true pour qu'elle subisse la physique mais ne bloque pas les autres
+    ballPointer = new Body({c3_1, c3_2, c3_3, c3_4}, {ec3_1, ec3_2, ec3_3, ec3_4, ec3_d}, {}, true, false);
+
+    // Ajout explicite au monde (car tes constructeurs ne le font pas automatiquement dans `world->bodies`)
+    world->bodies.push_back(cube1Pointer);
+    world->bodies.push_back(cube2Pointer);
+    world->bodies.push_back(ballPointer);
+}
+
 
 void loadBody(const Vector3& mousePos)
 {
@@ -533,25 +665,25 @@ void loadBody(const Vector3& mousePos)
 void loadGround()
 {
         // ----- SOL -----
-    Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
-    Point* s2 = new Point({800, 0, 0}, {0,0,0}, 0.0f);
-    Point* s3 = new Point({800, 50, 0}, {0,0,0}, 0.0f);
-    Point* s4 = new Point({0, 50, 0}, {0,0,0}, 0.0f);
-
-    Edge* se1 = new Edge(*s1, *s2);
-    Edge* se2 = new Edge(*s2, *s3);
-    Edge* se3 = new Edge(*s3, *s4);
-    Edge* se4 = new Edge(*s4, *s1);
-
-    Body* ground = new Body(
-        {s1, s2, s3, s4},
-        {se1, se2, se3, se4},
-        {},
-        false,  // ⚠️ IMPORTANT
-        true    // freeze
-    );
-    groundBody = ground;
-    world = new World({gravity, wind}, Body::bodies, 0.0f, 0.016f);
+    //Point* s1 = new Point({0, 0, 0}, {0,0,0}, 0.0f);
+    //Point* s2 = new Point({800, 0, 0}, {0,0,0}, 0.0f);
+    //Point* s3 = new Point({800, 50, 0}, {0,0,0}, 0.0f);
+    //Point* s4 = new Point({0, 50, 0}, {0,0,0}, 0.0f);
+//
+    //Edge* se1 = new Edge(*s1, *s2);
+    //Edge* se2 = new Edge(*s2, *s3);
+    //Edge* se3 = new Edge(*s3, *s4);
+    //Edge* se4 = new Edge(*s4, *s1);
+//
+    //Body* ground = new Body(
+    //    {s1, s2, s3, s4},
+    //    {se1, se2, se3, se4},
+    //    {},
+    //    false,  // ⚠️ IMPORTANT
+    //    true    // freeze
+    //);
+    //groundBody = ground;
+    world = new World({gravity, wind}, {}, 0.0f, 0.016f);
 }
 
 // ----------------------
@@ -588,10 +720,55 @@ void deleteAllBodies(){
 
 int main()
 {
+
+    SetConfigFlags(FLAG_FULLSCREEN_MODE);
     InitWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Physics Engine");
     SetTargetFPS(60);
 
-    loadGround();
+
+    int numeroDiapo = 0;
+    Vector3 diapoPos = Vector3{0.0f, 0.0f, 0.0f};
+    
+    Texture diapoText[NB_DIAPO];
+    diapoText[0] = LoadTexture("./diapos/2.png");
+    diapoText[1] = LoadTexture("./diapos/3.png");
+    diapoText[2] = LoadTexture("./diapos/4.png");
+    diapoText[3] = LoadTexture("./diapos/5.png");
+    diapoText[4] = LoadTexture("./diapos/6.png");
+    diapoText[5] = LoadTexture("./diapos/7.png");
+    diapoText[6] = LoadTexture("./diapos/8.png");
+    diapoText[7] = LoadTexture("./diapos/9.png");
+    diapoText[8] = LoadTexture("./diapos/10.png");
+    diapoText[9] = LoadTexture("./diapos/11.png");
+    diapoText[10] = LoadTexture("./diapos/12.png");
+    diapoText[11] = LoadTexture("./diapos/13.png");
+    diapoText[12] = LoadTexture("./diapos/14.png");
+    diapoText[13] = LoadTexture("./diapos/15.png");
+    diapoText[14] = LoadTexture("./diapos/16.png");
+    diapoText[15] = LoadTexture("./diapos/17.png");
+    diapoText[16] = LoadTexture("./diapos/18.png");
+    diapoText[17] = LoadTexture("./diapos/19.png");
+    diapoText[18] = LoadTexture("./diapos/20.png");
+    diapoText[19] = LoadTexture("./diapos/21.png");
+    diapoText[20] = LoadTexture("./diapos/22.png");
+    diapoText[21] = LoadTexture("./diapos/23.png");
+    diapoText[22] = LoadTexture("./diapos/24.png");
+    diapoText[23] = LoadTexture("./diapos/25.png");
+    diapoText[24] = LoadTexture("./diapos/26.png");
+    diapoText[25] = LoadTexture("./diapos/27.png");
+    diapoText[26] = LoadTexture("./diapos/28.png");
+    diapoText[27] = LoadTexture("./diapos/29.png");
+    diapoText[28] = LoadTexture("./diapos/30.png");
+    diapoText[29] = LoadTexture("./diapos/31.png");
+
+
+    Rectangle sourceRec = { 0.0f, 0.0f, (float)diapoText[0].width, (float)diapoText[0].height };
+
+
+    //loadGround();
+    world = new World({gravity, wind}, {}, 0.0f, 0.016f);
+    loadClothesline();
+    
     boxEnableGround = true;
     running = true;
     while (!WindowShouldClose())
@@ -600,17 +777,127 @@ int main()
         dt = fminf(dt, 0.016f);
 
         if (running) {
+            // diapo
+            Vector3 temp = diapoHanger->points[1]->pos_();
+            diapoPos.x = temp.x;
+
+
             Vector2 mouse = GetMousePosition();
 
                 // -------- INPUT --------
-            // if (IsKeyPressed(KEY_RIGHT)) {
-            //     //isDragging = false;
-            //     mouseState = IDLE;
-            //     SetMouseCursor(MOUSE_CURSOR_DEFAULT);
-            //     selectedPoint = nullptr;
-            //     currentScene = (currentScene + 1) % SCENE_COUNT;
-            //     loadScene(currentScene);
-            // }
+            if (IsKeyPressed(KEY_LEFT)) {
+                Vector3 p; 
+                p = diapoHanger->points[1]->pos_();
+                p.x -= 2;
+                diapoHanger->points[1]->pos_(p);
+                p.x -= 2;
+                diapoHanger->points[1]->oldPos_(p);
+
+                if(numeroDiapo > 0) numeroDiapo--;
+            }
+            if (IsKeyPressed(KEY_RIGHT)) {
+                Vector3 p; 
+                p = diapoHanger->points[1]->pos_();
+                p.x += 2;
+                diapoHanger->points[1]->pos_(p);
+                p.x += 2;
+                diapoHanger->points[1]->oldPos_(p);
+
+                if(numeroDiapo < NB_DIAPO) numeroDiapo++;
+            }
+
+            if(numeroDiapo == 21)
+            {
+                if(!pendulumLoaded)
+                {
+                    loadPendulum();
+                    pendulumLoaded = true;
+                }
+            }
+            else
+            {
+                if(pendulumLoaded && pendulumPointer != nullptr)
+                {
+                    // 1. On le retire du vecteur du monde
+                    auto& v = world->bodies;
+                    v.erase(std::remove(v.begin(), v.end(), pendulumPointer), v.end());
+
+                    // 2. On le retire du vecteur global des bodies (pour le dessin/clic)
+                    auto& vg = Body::bodies;
+                    vg.erase(std::remove(vg.begin(), vg.end(), pendulumPointer), vg.end());
+
+                    // 3. On libère la mémoire
+                    delete pendulumPointer;
+
+                    pendulumPointer = nullptr;
+                    pendulumLoaded = false;
+                }
+            }
+
+            if(numeroDiapo == 22)
+            {
+                if(!springLoaded)
+                {
+                    loadSpring();
+                    springLoaded = true;
+                }
+            }
+            else
+            {
+                if(springLoaded && springPointer != nullptr)
+                {
+                    // 1. On le retire du vecteur du monde
+                    auto& v = world->bodies;
+                    v.erase(std::remove(v.begin(), v.end(), springPointer), v.end());
+
+                    // 2. On le retire du vecteur global des bodies (pour le dessin/clic)
+                    auto& vg = Body::bodies;
+                    vg.erase(std::remove(vg.begin(), vg.end(), springPointer), vg.end());
+
+                    // 3. On libère la mémoire
+                    delete springPointer;
+
+                    springPointer = nullptr;
+                    springLoaded = false;
+                }
+            }
+            if(numeroDiapo == 23)
+            {
+                if(!ballAndWallLoaded)
+                {
+                    loadBallAndWall();
+                    ballAndWallLoaded = true;
+                }
+            }
+            else
+            {
+                // Dans ton bloc de nettoyage (else numeroDiapo != 23)
+                if(ballAndWallLoaded) {
+                    auto& v = world->bodies;
+                    auto& vg = Body::bodies;
+
+                    // Supprimer Cube 1
+                    if(cube1Pointer) {
+                        v.erase(std::remove(v.begin(), v.end(), cube1Pointer), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), cube1Pointer), vg.end());
+                        delete cube1Pointer;
+                        cube1Pointer = nullptr;
+                    }
+                    if(cube2Pointer) {
+                        v.erase(std::remove(v.begin(), v.end(), cube2Pointer), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), cube2Pointer), vg.end());
+                        delete cube2Pointer;
+                        cube2Pointer = nullptr;
+                    }
+                    if(ballPointer) {
+                        v.erase(std::remove(v.begin(), v.end(), ballPointer), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), ballPointer), vg.end());
+                        delete ballPointer;
+                        ballPointer = nullptr;
+                    }
+                    ballAndWallLoaded = false;
+                }
+            }
 
             // if (IsKeyPressed(KEY_LEFT)) {
             //     //isDragging = false;
@@ -696,130 +983,24 @@ int main()
         BeginDrawing();
         ClearBackground(RAYWHITE);
 
-            DrawLine(500, 0, 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.6f));
-            DrawRectangle(500, 0, GetScreenWidth() - 500, GetScreenHeight(), Fade(LIGHTGRAY, 0.3f));
-
-            GuiSetStyle(DEFAULT, TEXT_SIZE, 24);
-            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_RIGHT);
-            GuiSetStyle(LABEL, TEXT_PADDING, 5);
-            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
-            GuiLabel((Rectangle){500, 10, static_cast<float>(GetScreenWidth() - 500), 32}, "Settings");
-            
-            GuiSetStyle(DEFAULT, TEXT_SIZE, 16);
-            GuiSetStyle(LABEL, TEXT_ALIGNMENT, TEXT_ALIGN_LEFT);
-            GuiSetStyle(LABEL, TEXT_PADDING, 5);
-            GuiSetStyle(LABEL, TEXT_COLOR_NORMAL, ColorToInt(GRAY));
-
-            GuiLabel((Rectangle){500, 30, static_cast<float>(GetScreenWidth() - 500), 32}, "Bodies & shapes");
-
-            GuiLabel((Rectangle){500, 170, static_cast<float>(GetScreenWidth() - 500), 32}, "World Environment");
-
-            GuiLabel((Rectangle){500, 310, static_cast<float>(GetScreenWidth() - 500), 32}, "Bullet");
-
-            if(GuiCheckBox((Rectangle){505, 140, 20, 20}, "Enable Ground", &boxEnableGround)) {
-                if (boxEnableGround) groundBody->enable(world->bodies);
-                else groundBody->disable(world->bodies);      
-            }
-            GuiCheckBox((Rectangle){640, 200, 20, 20}, "Enable Gravity", &boxEnableGravity);
-            GuiCheckBox((Rectangle){640, 240, 20, 20}, "Enable Wind", &boxEnableWind);
-            //GuiCheckBox((Rectangle){640, 340, 20, 20}, "Enable Bullet", &boxEnableBullet);
-
-            GuiSetStyle(DEFAULT, TEXT_SIZE, 12);
-
-            GuiToggle((Rectangle){505, 60, 120, 30}, "#149#Add Body", &btnAddBodyPressed);
-
-            if(btnAddBodyPressed)
-            {
-                mouseState = PLACING;
-                SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
-                std::cout << "MODE PLACING" << std::endl;
-            }
-
-            if(GuiButton((Rectangle){640, 60, 120, 30}, "#143#Del. Body")) deleteBody();
-
-            if(GuiButton((Rectangle){505, 100, 120, 30}, "#162#Add Volume")) addVolume();
-            if(GuiButton((Rectangle){640, 100, 120, 30}, "#143#Del. Body")) deleteVolume();
-            
-            GuiToggle((Rectangle){505, 200, 120, 30}, "#142#Config Gravity", &btnConfigGravityWindow);
-            if(btnConfigGravityWindow)
-            {
-                DrawRectangle(30, 70, 150, 70, Fade(LIGHTGRAY, 0.3f));
-                GuiLabel((Rectangle){30, 70, 150, 32}, "Config Gravity");
-                if (GuiValueBoxFloat((Rectangle){80, 100, 80, 30}, "Gravity", textGravityInput, &world->gravity_(), textBoxGravityEditMode))
-                {
-                    textBoxGravityEditMode = !textBoxGravityEditMode;
-                    std::cout << world->gravity_() << std::endl;
-                }
-            }
-
-            GuiToggle((Rectangle){505, 240, 120, 30}, "#142#Config Wind", &btnConfigWindWindow);
-            if(btnConfigWindWindow)
-            {
-                DrawRectangle(30, 150, 150, 140, Fade(LIGHTGRAY, 0.3f));
-                GuiLabel((Rectangle){30, 150, 150, 32}, "Config Wind");
-                if (GuiValueBoxFloat((Rectangle){ 50, 180, 100, 32 }, "x", textWindXInput, &world->windX_(), textBoxWindXEditMode))
-                {
-                    textBoxWindXEditMode = !textBoxWindXEditMode;
-                    std::cout << world->windX_() << std::endl;
-                }
-
-                if (GuiValueBoxFloat((Rectangle){ 50, 215, 100, 32 }, "y", textWindYInput, &world->windY_(), textBoxWindYEditMode))
-                {
-                    textBoxWindYEditMode = !textBoxWindYEditMode;
-                    std::cout << world->windY_() << std::endl;
-                }
-
-                if (GuiValueBoxFloat((Rectangle){ 50, 250, 100, 32 }, "z", textWindZInput, &world->windZ_(), textBoxWindZEditMode))
-                {
-                    textBoxWindZEditMode = !textBoxWindZEditMode;
-                    std::cout << world->windZ_() << std::endl;
-                }
-            }
-
-            GuiToggle((Rectangle){505, 340, 120, 30}, "#142#Config Bullet", &btnConfigBulletWindow);
-            if(btnConfigBulletWindow)
-            {
-                DrawRectangle(190, 70, 150, 150, Fade(LIGHTGRAY, 0.3f));
-                GuiLabel((Rectangle){190, 70, 150, 32}, "Config Bullet");
-                // Selection du point
-                if(GuiButton((Rectangle){200, 100, 120, 30}, "#142#Select Target")) btnSelectTarget = !btnSelectTarget;
-
-                    if(btnSelectTarget)
-                    {
-                        mouseState = TARGETING;
-                        std::cout << "MODE TARGET" << std::endl;
-
-                        btnSelectTarget = false;
-
-                    }
-
-                if(GuiValueBoxFloat((Rectangle){210, 140, 100, 20}, "x", textBulletXInput, &impulseBuf.x, textBoxBulletXEditMode)) textBoxBulletXEditMode = !textBoxBulletXEditMode;
-                if(GuiValueBoxFloat((Rectangle){210, 165, 100, 20}, "y", textBulletYInput, &impulseBuf.y, textBoxBulletYEditMode)) textBoxBulletYEditMode = !textBoxBulletYEditMode;
-                if(GuiValueBoxFloat((Rectangle){210, 190, 100, 20}, "z", textBulletZInput, &impulseBuf.z, textBoxBulletZEditMode)) textBoxBulletZEditMode = !textBoxBulletZEditMode;            
-            }
-
-            GuiToggle((Rectangle){640, 340, 120, 30}, "#142#Shoot Target", &btnShootTarget);
-            if(btnShootTarget)
-            {
-                if(selectedTarget) selectedTarget->impulse(impulseBuf);
-
-                btnShootTarget = false;
-            }
-            
-            GuiToggle((Rectangle){505, 400, 120, 30}, "#134#Run", &running);
-
-        // -------
+            Rectangle destRec = { diapoPos.x-GetScreenWidth()/2, diapoPos.y, GetScreenWidth(), GetScreenHeight() }; // Ici on force 100x100 pixels
+            Vector2 origin = { 0.0f, 0.0f }; // Point de pivot (0,0 = en haut à gauche)
+            DrawTexturePro(diapoText[numeroDiapo], sourceRec, destRec, origin, 0.0f, WHITE);
 
             for (Body* b : Body::bodies) b->Draw();
             
             if(selectedTarget) selectedTarget->Draw(GREEN);
 
             DrawText(TextFormat("Scene: %d", currentScene), 10, 10, 20, BLACK);
-            
 
         EndDrawing();
     }
 
+    for(int i = 0; i < NB_DIAPO; i++)
+    {
+        UnloadTexture(diapoText[i]);
+    }
+    
     CloseWindow();
     
     return 0;
