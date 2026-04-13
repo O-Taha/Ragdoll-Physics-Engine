@@ -36,7 +36,6 @@ enum SceneType {
 
 int currentScene = 0;
 World* world = nullptr;
-Body* groundBody = nullptr;
 
 Point* selectedPoint = nullptr;
 Point* selectedTarget = nullptr;
@@ -64,6 +63,11 @@ bool ballAndWallLoaded = false;
 Body* cube1Pointer = nullptr;
 Body* cube2Pointer = nullptr;
 Body* ballPointer = nullptr;
+
+bool finalLoaded = false;
+Body* groundBody = nullptr;
+Body* finalWall = nullptr;
+Body* ragdollBody = nullptr;
 
 Body* diapoHanger = nullptr;
 
@@ -625,6 +629,109 @@ void loadBallAndWall()
 }
 
 
+void loadFinal()
+{
+    // Sol
+    Point* s1 = new Point({0, 200, 0}, {0,0,0}, 0.0f);
+    Point* s2 = new Point({GetScreenWidth(), 200, 0}, {0,0,0}, 0.0f);
+    Point* s3 = new Point({GetScreenWidth(), 250, 0}, {0,0,0}, 0.0f);
+    Point* s4 = new Point({0, 250, 0}, {0,0,0}, 0.0f);
+
+    Edge* se1 = new Edge(*s1, *s2);
+    Edge* se2 = new Edge(*s2, *s3);
+    Edge* se3 = new Edge(*s3, *s4);
+    Edge* se4 = new Edge(*s4, *s1);
+
+    groundBody = new Body(
+        {s1, s2, s3, s4},
+        {se1, se2, se3, se4},
+        {},
+        false,
+        true 
+    );
+
+    // Mur
+    float groundY = 250; // Juste au dessus du sol
+    float recWidth = 100.0f;
+    float recHeight = 100.0f;
+    float recStartX = 250.0f; // Positionné pour intercepter la trajectoire après le toboggan
+
+    Point* c2_1 = new Point({recStartX,            groundY,             0}, {0,0,0}, 0.0f); // BG
+    Point* c2_2 = new Point({recStartX + recWidth, groundY,             0}, {0,0,0}, 0.0f); // BD
+    Point* c2_3 = new Point({recStartX + recWidth, groundY + recHeight, 0}, {0,0,0}, 0.0f); // HD
+    Point* c2_4 = new Point({recStartX,            groundY + recHeight, 0}, {0,0,0}, 0.0f); // HG
+
+    Edge* ec2_1 = new Edge(*c2_1, *c2_2);
+    Edge* ec2_2 = new Edge(*c2_2, *c2_3);
+    Edge* ec2_3 = new Edge(*c2_3, *c2_4);
+    Edge* ec2_4 = new Edge(*c2_4, *c2_1);
+    //Edge* ec2_d = new Edge(*c2_1, *c2_3); // Diagonale de rigidité
+
+    finalWall = new Body({c2_1, c2_2, c2_3, c2_4}, {ec2_1, ec2_2, ec2_3, ec2_4}, {}, false, true);
+
+    // Ragdoll
+    float x = GetScreenWidth()/2, y = 500;
+
+    //Point* head   = new Point({x, y + 30, 0}, {0,0,0}, 0.8f);  // Une tête pour l'équilibre
+    Point* neck   = new Point({x, y, 0}, {0,0,0}, 1.0f);
+    Point* l_shdr = new Point({x - 45, y - 10, 0}, {0,0,0}, 1.0f);
+    Point* r_shdr = new Point({x + 45, y - 10, 0}, {0,0,0}, 1.0f);
+    Point* l_hip  = new Point({x - 20, y - 100, 0}, {0,0,0}, 1.0f);
+    Point* r_hip  = new Point({x + 20, y - 100, 0}, {0,0,0}, 1.0f);
+
+    // Membres
+    Point* l_elbow = new Point({x - 80, y - 30, 0}, {0,0,0}, 1.2f);
+    Point* l_hand  = new Point({x - 110, y - 50, 0}, {0,0,0}, 1.2f);
+    Point* r_elbow = new Point({x + 80, y - 30, 0}, {0,0,0}, 1.2f);
+    Point* r_hand  = new Point({x + 110, y - 50, 0}, {0,0,0}, 1.2f);
+
+    Point* l_knee = new Point({x - 25, y - 160, 0}, {0,0,0}, 1.2f);
+    Point* l_foot = new Point({x - 25, y - 220, 0}, {0,0,0}, 1.2f);
+    Point* r_knee = new Point({x + 25, y - 160, 0}, {0,0,0}, 1.2f);
+    Point* r_foot = new Point({x + 25, y - 220, 0}, {0,0,0}, 1.2f);
+
+    auto makeEdge = [](Point* a, Point* b, float stiff = 1.0f) {
+        return new Edge(*a, *b, Vector3Distance(a->pos_(), b->pos_()), stiff);
+    };
+
+    std::vector<Point*> pts = {neck, l_shdr, r_shdr, l_hip, r_hip, l_elbow, l_hand, r_elbow, r_hand, l_knee, l_foot, r_knee, r_foot };
+
+    std::vector<Edge*> edges;
+
+    //edges.push_back(makeEdge(head, neck));
+    edges.push_back(makeEdge(neck, l_shdr));
+    edges.push_back(makeEdge(neck, r_shdr));
+    edges.push_back(makeEdge(l_shdr, r_shdr));
+    edges.push_back(makeEdge(l_shdr, l_hip, 0.05f));
+    edges.push_back(makeEdge(r_shdr, r_hip, 0.05f));
+    edges.push_back(makeEdge(l_hip, r_hip));
+    
+    // Diagonales de buste (Crucial pour la solidité)
+    edges.push_back(makeEdge(l_shdr, r_hip, 0.05f));
+    edges.push_back(makeEdge(r_shdr, l_hip, 0.05f));
+
+    // --- 3. MEMBRES ARTICULÉS ---
+    edges.push_back(makeEdge(l_shdr, l_elbow)); edges.push_back(makeEdge(l_elbow, l_hand));
+    edges.push_back(makeEdge(r_shdr, r_elbow)); edges.push_back(makeEdge(r_elbow, r_hand));
+    edges.push_back(makeEdge(l_hip, l_knee));   edges.push_back(makeEdge(l_knee, l_foot));
+    edges.push_back(makeEdge(r_hip, r_knee));   edges.push_back(makeEdge(r_knee, r_foot));
+
+    // --- 4. MUSCLES DE SOUTIEN (Stiffness basse) ---
+    // Ces ressorts empêchent les bras et jambes de pendre comme des cordes mortes
+    // Ils essaient de ramener les membres vers une pose en T naturelle
+    edges.push_back(makeEdge(neck, l_elbow, 0.1f));
+    edges.push_back(makeEdge(neck, r_elbow, 0.1f));
+    edges.push_back(makeEdge(l_shdr, l_knee, 0.05f));
+    edges.push_back(makeEdge(r_shdr, r_knee, 0.05f));
+
+    ragdollBody = new Body(pts, edges, {}, true, false);
+
+    world->bodies.push_back(groundBody);
+    world->bodies.push_back(finalWall);
+    world->bodies.push_back(ragdollBody);
+}
+
+
 void loadBody(const Vector3& mousePos)
 {
     float x = mousePos.x, y = mousePos.y;
@@ -661,6 +768,7 @@ void loadBody(const Vector3& mousePos)
 
     world->bodies.push_back(body);
 }
+
 
 void loadGround()
 {
@@ -896,6 +1004,44 @@ int main()
                         ballPointer = nullptr;
                     }
                     ballAndWallLoaded = false;
+                }
+            }
+
+            if(numeroDiapo == 24)
+            {
+                if(!finalLoaded)
+                {
+                    loadFinal();
+                    finalLoaded = true;
+                }
+            }
+            else
+            {
+                // Dans ton bloc de nettoyage (else numeroDiapo != 23)
+                if(finalLoaded) {
+                    auto& v = world->bodies;
+                    auto& vg = Body::bodies;
+
+                    // Supprimer Cube 1
+                    if(groundBody) {
+                        v.erase(std::remove(v.begin(), v.end(), groundBody), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), groundBody), vg.end());
+                        delete groundBody;
+                        groundBody = nullptr;
+                    }
+                    if(finalWall) {
+                        v.erase(std::remove(v.begin(), v.end(), finalWall), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), finalWall), vg.end());
+                        delete finalWall;
+                        finalWall = nullptr;
+                    }
+                    if(ragdollBody) {
+                        v.erase(std::remove(v.begin(), v.end(), ragdollBody), v.end());
+                        vg.erase(std::remove(vg.begin(), vg.end(), ragdollBody), vg.end());
+                        delete ragdollBody;
+                        ragdollBody = nullptr;
+                    }
+                    finalLoaded = false;
                 }
             }
 
